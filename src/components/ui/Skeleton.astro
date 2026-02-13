@@ -1,0 +1,20 @@
+---
+// Componente atómico para estados de carga
+// Se usa en los 'slot="fallback"' de las Server Islands
+
+interface Props {
+  class?: string;
+  [key: string]: any; // Permite pasar cualquier prop HTML extra (style, id, etc)
+}
+
+const { class: className, ...rest } = Astro.props;
+---
+
+<div 
+  class:list={[
+    "animate-pulse bg-gray-200 rounded-md", // Clases base Tailwind
+    className // Clases personalizadas (ancho, alto)
+  ]} 
+  {...rest}
+></div>
+

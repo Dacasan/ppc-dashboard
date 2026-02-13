@@ -1,0 +1,44 @@
+---
+import type { BrandOption } from '../../lib/api';
+
+interface Props {
+  brand: BrandOption;
+}
+
+const { brand } = Astro.props;
+const currentPath = Astro.url.pathname;
+// Verificamos si la URL actual contiene el slug de esta marca
+const isActive = currentPath.includes(`/dashboard/${brand.slug}`);
+---
+
+<a 
+  href={`/dashboard/${brand.slug}`} 
+  class="block group relative transition-all hover:scale-[1.02] active:scale-95"
+>
+    <div class:list={[
+        "p-3 rounded-xl border flex items-center gap-3 transition-colors",
+        isActive 
+            ? 'bg-zinc-800 border-zinc-700 text-white shadow-lg shadow-black/20' 
+            : 'bg-white border-zinc-200 text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50'
+    ]}>
+        <div class:list={[
+            "w-10 h-10 rounded-lg flex items-center justify-center text-xl shadow-sm transition-colors",
+            isActive ? 'bg-zinc-700 text-white' : 'bg-zinc-100 text-zinc-500'
+        ]}>
+            {brand.emoji}
+        </div>
+        
+        <div class="flex flex-col flex-1 min-w-0">
+            <span class:list={["font-bold text-sm leading-tight truncate", isActive ? "text-white" : "text-zinc-800"]}>
+                {brand.name}
+            </span>
+            <span class:list={["text-[10px] uppercase tracking-wider font-medium", isActive ? 'text-zinc-400' : 'text-zinc-400']}>
+                Ver métricas
+            </span>
+        </div>
+
+        {isActive && (
+            <div class="absolute right-3 w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
+        )}
+    </div>
+</a>

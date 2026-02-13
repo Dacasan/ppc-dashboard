@@ -1,0 +1,43 @@
+---
+import DashboardLayout from '../../layouts/DashboardLayout.astro';
+import BrandMonthView from '../../components/dashboard/BrandMonthView.astro';
+import CampaignsTable from '../../components/dashboard/CampaignsTable.astro';
+import { getUniqueBrands } from '../../lib/api';
+import { getBrandFullData } from '../../lib/data-service';
+
+export const prerender = false;
+const { brand } = Astro.params;
+
+// 1. Obtener la marca real
+const brands = await getUniqueBrands();
+const currentBrand = brands.find(b => b.slug === brand);
+if (!currentBrand) return Astro.redirect('/');
+
+// 2. Data Service
+const { brandReport, campaigns } = await getBrandFullData(currentBrand.name, { year: "2026", month: 1 });
+---
+
+<DashboardLayout title={`Dashboard | ${currentBrand.name}`}>
+    <div class="flex flex-col gap-6">
+        <header class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-white border border-zinc-200 rounded-xl flex items-center justify-center text-2xl shadow-sm">
+                    {currentBrand.emoji}
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-zinc-900 leading-none">{currentBrand.name}</h1>
+                    <p class="text-sm text-zinc-500 mt-1">Enero 2026</p>
+                </div>
+            </div>
+            <a href="/" class="hidden md:inline-flex items-center gap-2 text-xs font-medium px-3 py-2 bg-white border rounded-lg hover:bg-zinc-50">
+                <i class="fa-solid fa-arrow-left"></i> Volver
+            </a>
+        </header>
+
+        {brandReport ? <BrandMonthView report={brandReport} /> : 
+            <div class="p-4 border border-yellow-200 bg-yellow-50 text-yellow-800 rounded-lg text-sm">Sin datos de Marca.</div>
+        }
+
+        {campaigns.length > 0 && <CampaignsTable campaigns={campaigns} />}
+    </div>
+</DashboardLayout>

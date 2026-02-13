@@ -1,0 +1,65 @@
+---
+import { formatMoney, getCplColor, getChannelInfo } from '../../lib/format';
+import type { CampaignReport } from '../../types/db';
+
+interface Props {
+  campaigns: CampaignReport[];
+}
+
+const { campaigns } = Astro.props;
+---
+
+<div class="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm mt-6">
+    <div class="px-5 py-4 border-b border-zinc-100 bg-zinc-50 flex justify-between items-center">
+        <h3 class="font-bold text-zinc-800">Desglose de Campañas</h3>
+        <span class="text-xs bg-white border border-zinc-200 px-2 py-1 rounded-md text-zinc-500 shadow-sm">
+            {campaigns.length} activas
+        </span>
+    </div>
+    
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left whitespace-nowrap">
+            <thead class="text-xs text-zinc-400 uppercase bg-zinc-50 border-b border-zinc-100">
+                <tr>
+                    <th class="px-6 py-3 font-semibold">Campaña</th>
+                    <th class="px-6 py-3 text-center">Canal</th>
+                    <th class="px-6 py-3 text-right">Gasto</th>
+                    <th class="px-6 py-3 text-right">Leads</th>
+                    <th class="px-6 py-3 text-right">CPL</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-zinc-100">
+                {campaigns.map((camp) => {
+                    const cpl = camp.leads_total_mes > 0 ? camp.cost_total_mes / camp.leads_total_mes : 0;
+                    const channel = getChannelInfo(camp.campaign_name || '');
+                    
+                    return (
+                        <tr class="hover:bg-zinc-50 transition-colors">
+                            <td class="px-6 py-4 font-medium text-zinc-900 max-w-[200px] truncate" title={camp.campaign_name}>
+                                {camp.campaign_name}
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold border ${channel.color.replace('text-', 'border-').replace('bg-', 'border-opacity-20 ')} ${channel.color}`}>
+                                    <i class={`fa-brands ${channel.icon}`}></i>
+                                    {channel.name}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-right font-mono text-zinc-600">
+                                {formatMoney(camp.cost_total_mes)}
+                            </td>
+                            <td class="px-6 py-4 text-right font-bold text-zinc-800">
+                                {camp.leads_total_mes}
+                            </td>
+                            <td class="px-6 py-4 text-right font-mono text-xs">
+                                <span class={`px-2 py-1 rounded border ${getCplColor(cpl)}`}>
+                                    {formatMoney(cpl)}
+                                </span>
+                            </td>
+                        </tr>
+                    );
+                })}
+            </tbody>
+        </table>
+    </div>
+</div>
+

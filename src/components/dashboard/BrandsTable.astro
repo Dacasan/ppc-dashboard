@@ -1,0 +1,64 @@
+---
+import { getBrandsRanking } from '../../lib/data-service';
+import { formatMoney, getCplColor } from '../../lib/format';
+import { getUniqueBrands } from '../../lib/api';
+
+const records = await getBrandsRanking({ year: "2026", month: 1 });
+
+// Helper para obtener el emoji (cruzamos con tu API local de marcas)
+const uniqueBrands = await getUniqueBrands();
+const getEmoji = (name: string) => uniqueBrands.find(b => name.includes(b.name))?.emoji || '📊';
+const getSlug = (name: string) => uniqueBrands.find(b => name.includes(b.name))?.slug || '#';
+---
+
+<div class="bg-white border border-zinc-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="p-5 border-b border-zinc-100 bg-zinc-50/50 flex justify-between items-center">
+        <h3 class="font-bold text-zinc-800">Ranking por Marca</h3>
+        <button class="text-xs text-blue-600 font-medium hover:underline">Exportar</button>
+    </div>
+    
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left">
+            <thead class="text-xs text-zinc-400 uppercase bg-zinc-50 border-b border-zinc-100">
+                <tr>
+                    <th class="px-6 py-3">Marca</th>
+                    <th class="px-6 py-3 text-right">Gasto</th>
+                    <th class="px-6 py-3 text-right">Leads</th>
+                    <th class="px-6 py-3 text-right">CPL</th>
+                    <th class="px-6 py-3 text-center">Estado</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-zinc-100">
+                {records.map((brand) => {
+                    const cpl = brand.leads_total_mes > 0 ? brand.cost_total_mes / brand.leads_total_mes : 0;
+                    return (
+                        <tr class="hover:bg-zinc-50 transition-colors group">
+                            <td class="px-6 py-4 font-medium text-zinc-900 flex items-center gap-3 whitespace-nowrap">
+                                <span class="w-8 h-8 rounded bg-white border border-zinc-200 flex items-center justify-center text-lg">
+                                    {getEmoji(brand.brand || brand.nombre_cuenta)}
+                                </span>
+                                {brand.brand || brand.nombre_cuenta}
+                            </td>
+                            <td class="px-6 py-4 text-right font-mono text-zinc-600">{formatMoney(brand.cost_total_mes)}</td>
+                            <td class="px-6 py-4 text-right font-bold text-zinc-900">{brand.leads_total_mes}</td>
+                            <td class="px-6 py-4 text-right font-mono text-xs">
+                                <span class={`px-2 py-1 rounded border ${getCplColor(cpl)}`}>
+                                    {formatMoney(cpl)}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <a href={`/dashboard/${getSlug(brand.brand || brand.nombre_cuenta)}`} class="text-zinc-300 hover:text-blue-600">
+                                    <i class="fa-solid fa-chevron-right"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    );
+                })}
+            </tbody>
+        </table>
+    </div>
+</div>

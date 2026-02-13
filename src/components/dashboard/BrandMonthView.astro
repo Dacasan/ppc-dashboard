@@ -1,0 +1,72 @@
+---
+import type { CampaignReport } from '../../types/db';
+import { formatMoney } from '../../lib/format';
+
+interface Props {
+  report: CampaignReport;
+}
+
+const { report } = Astro.props;
+
+// Periodos de 5 días
+const periods = [
+  { label: 'Ene 1-5',   spend: report.cost_01_05, leads: report.leads_01_05 },
+  { label: 'Ene 6-10',  spend: report.cost_06_10, leads: report.leads_06_10 },
+  { label: 'Ene 11-15', spend: report.cost_11_15, leads: report.leads_11_15 },
+  { label: 'Ene 16-20', spend: report.cost_16_20, leads: report.leads_16_20 },
+  { label: 'Ene 21-25', spend: report.cost_21_25, leads: report.leads_21_25 },
+  { label: 'Ene 26-31', spend: report.cost_26_31, leads: report.leads_26_31 },
+];
+
+const totalSpend = report.cost_total_mes;
+const totalLeads = report.leads_total_mes;
+const avgCPL = totalLeads > 0 ? totalSpend / totalLeads : 0;
+---
+
+<div class="flex md:grid md:grid-cols-2 gap-4 mb-6 overflow-x-auto snap-x snap-mandatory pb-4 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0 no-scrollbar">
+    <div class="min-w-[70%] md:min-w-0 snap-center bg-white p-5 rounded-xl border border-zinc-200 shadow-sm shrink-0">
+        <div class="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Gasto Mensual</div>
+        <div class="text-3xl font-black text-zinc-900 mt-1">{formatMoney(totalSpend)}</div>
+        <div class="text-xs text-emerald-600 mt-1">↑ 8.2% vs objetivo</div>
+    </div>
+    <div class="min-w-[70%] md:min-w-0 snap-center bg-white p-5 rounded-xl border border-zinc-200 shadow-sm shrink-0">
+        <div class="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">CPL Promedio</div>
+        <div class="text-3xl font-black text-zinc-900 mt-1">{formatMoney(avgCPL)}</div>
+        <div class="text-xs text-rose-500 mt-1">↑ 2.1% vs objetivo</div>
+    </div>
+</div>
+
+<div class="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
+    <div class="px-5 py-4 border-b border-zinc-100 bg-zinc-50 flex justify-between items-center">
+        <h3 class="font-bold text-sm text-zinc-700">Rendimiento por Períodos</h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm whitespace-nowrap">
+            <thead class="bg-zinc-50 text-zinc-400 text-[10px] uppercase font-bold border-b border-zinc-100">
+                <tr>
+                    <th class="px-6 py-3 text-left">Período</th>
+                    <th class="px-6 py-3 text-right">Gasto</th>
+                    <th class="px-6 py-3 text-right">Leads</th>
+                    <th class="px-6 py-3 text-right">CPL</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-zinc-100">
+                {periods.map((row) => {
+                    const cpl = row.leads > 0 ? row.spend / row.leads : 0;
+                    return (
+                        <tr class="hover:bg-zinc-50/50 transition-colors">
+                            <td class="px-6 py-3 font-medium text-zinc-700">{row.label}</td>
+                            <td class="px-6 py-3 text-right font-mono text-zinc-600">{formatMoney(row.spend)}</td>
+                            <td class="px-6 py-3 text-right font-bold text-zinc-900">{row.leads}</td>
+                            <td class="px-6 py-3 text-right font-mono text-xs">
+                                <span class={`px-2 py-1 rounded border ${cpl > 1000 ? 'bg-red-50 text-red-700 border-red-100' : 'bg-green-50 text-green-700 border-green-100'}`}>
+                                    {formatMoney(cpl)}
+                                </span>
+                            </td>
+                        </tr>
+                    )
+                })}
+            </tbody>
+        </table>
+    </div>
+</div>

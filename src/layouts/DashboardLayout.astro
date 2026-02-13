@@ -1,0 +1,118 @@
+---
+import { ClientRouter } from 'astro:transitions';
+import AsideMenu from '../components/sidemenu/AsideMenu.astro';
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <title>{title}</title>
+    <ClientRouter />
+</head>
+<body class="bg-zinc-50 text-zinc-900 font-sans antialiased h-screen flex overflow-hidden">
+    
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-[280px] bg-white border-r border-zinc-200 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out md:relative flex flex-col h-full shrink-0 shadow-2xl md:shadow-none">
+        
+        <div class="p-4 h-16 flex items-center justify-between border-b border-zinc-100">
+            <a href="/" class="flex items-center gap-2 font-bold text-xl tracking-tight text-zinc-800">
+                <span class="w-6 h-6 rounded bg-blue-600 flex items-center justify-center text-white text-xs">A1</span>
+                Marketing
+            </a>
+            <button id="close-sidebar" class="md:hidden text-zinc-400 hover:text-zinc-600">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
+
+        <AsideMenu />
+
+        <div class="p-4 border-t border-zinc-100 mt-auto">
+            <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-zinc-50 cursor-pointer transition">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500"></div>
+                <div class="text-xs">
+                    <p class="font-bold text-zinc-700">Admin User</p>
+                    <p class="text-zinc-400">admin@a1.com</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <div id="overlay" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden glass transition-opacity opacity-0"></div>
+
+    <main class="flex-1 flex flex-col h-full overflow-hidden relative w-full">
+        
+        <header class="md:hidden h-16 bg-white border-b border-zinc-200 flex items-center justify-between px-4 shrink-0 sticky top-0 z-30">
+            <div class="flex items-center gap-3">
+                <button id="open-sidebar" class="p-2 -ml-2 text-zinc-600 hover:bg-zinc-100 rounded-lg">
+                    <i class="fa-solid fa-bars text-xl"></i>
+                </button>
+                <span class="font-bold text-lg text-zinc-800">A1 Dashboard</span>
+            </div>
+            <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">
+                AU
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth pb-24">
+            <div class="max-w-7xl mx-auto flex flex-col gap-6">
+                <div class="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 no-scrollbar">
+                    <button class="whitespace-nowrap px-4 py-1.5 rounded-full bg-zinc-900 text-white text-xs font-medium">Todo</button>
+                    <button class="whitespace-nowrap px-4 py-1.5 rounded-full bg-white border border-zinc-200 text-zinc-600 text-xs font-medium hover:border-zinc-300">Google Ads</button>
+                    <button class="whitespace-nowrap px-4 py-1.5 rounded-full bg-white border border-zinc-200 text-zinc-600 text-xs font-medium hover:border-zinc-300">Meta Ads</button>
+                    <button class="whitespace-nowrap px-4 py-1.5 rounded-full bg-white border border-zinc-200 text-zinc-600 text-xs font-medium hover:border-zinc-300">TikTok</button>
+                </div>
+
+                <slot />
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('overlay');
+        const openBtn = document.getElementById('open-sidebar');
+        const closeBtn = document.getElementById('close-sidebar');
+
+        function toggleMenu() {
+            const isClosed = sidebar?.classList.contains('-translate-x-full');
+            
+            if (isClosed) {
+                // Abrir
+                sidebar?.classList.remove('-translate-x-full');
+                overlay?.classList.remove('hidden');
+                setTimeout(() => overlay?.classList.remove('opacity-0'), 10); // Animación fade
+            } else {
+                // Cerrar
+                sidebar?.classList.add('-translate-x-full');
+                overlay?.classList.add('opacity-0');
+                setTimeout(() => overlay?.classList.add('hidden'), 300); // Esperar animación
+            }
+        }
+
+        openBtn?.addEventListener('click', toggleMenu);
+        closeBtn?.addEventListener('click', toggleMenu);
+        overlay?.addEventListener('click', toggleMenu);
+
+        // Cerrar menú al navegar (Astro View Transitions)
+        document.addEventListener('astro:after-swap', () => {
+            sidebar?.classList.add('-translate-x-full');
+            overlay?.classList.add('hidden', 'opacity-0');
+            
+            // Re-asignar eventos porque el DOM cambió
+            document.getElementById('open-sidebar')?.addEventListener('click', toggleMenu);
+            document.getElementById('close-sidebar')?.addEventListener('click', toggleMenu);
+            document.getElementById('overlay')?.addEventListener('click', toggleMenu);
+        });
+    </script>
+</body>
+</html>

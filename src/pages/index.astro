@@ -1,0 +1,48 @@
+---
+import DashboardLayout from '../layouts/DashboardLayout.astro';
+import GlobalKPIs from '../components/dashboard/GlobalKPIs.astro';
+import BrandsTable from '../components/dashboard/BrandsTable.astro';
+import Skeleton from '../components/ui/Skeleton.astro';
+---
+
+<DashboardLayout title="Resumen Global | A1 Marketing">
+    
+    <section class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4">
+        <div>
+            <h1 class="text-2xl md:text-3xl font-black text-zinc-900 tracking-tight">Resumen Global</h1>
+            <p class="text-zinc-500 text-sm mt-1 font-medium">
+                Vista general de todas las cuentas activas
+            </p>
+        </div>
+        <div class="flex gap-2">
+            <span class="px-3 py-1.5 text-xs font-bold bg-white border border-zinc-300 rounded-lg shadow-sm text-zinc-700 flex items-center gap-2">
+                <span class="w-2 h-2 bg-green-500 rounded-full"></span>
+                Enero 2026
+            </span>
+        </div>
+    </section>
+
+    <GlobalKPIs server:defer>
+        <div slot="fallback" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <Skeleton class="h-32 w-full rounded-xl" />
+            <Skeleton class="h-32 w-full rounded-xl" />
+            <Skeleton class="h-32 w-full rounded-xl" />
+            <Skeleton class="h-32 w-full rounded-xl" />
+        </div>
+    </GlobalKPIs>
+
+    <BrandsTable server:defer>
+        <div slot="fallback" class="bg-white border border-zinc-200 rounded-xl p-6">
+            <div class="flex justify-between mb-6">
+                <Skeleton class="h-6 w-32" />
+                <Skeleton class="h-6 w-20" />
+            </div>
+            <div class="space-y-4">
+                <Skeleton class="h-10 w-full" />
+                <Skeleton class="h-10 w-full" />
+                <Skeleton class="h-10 w-full" />
+            </div>
+        </div>
+    </BrandsTable>
+
+</DashboardLayout>
