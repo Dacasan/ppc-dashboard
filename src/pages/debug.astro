@@ -1,22 +1,69 @@
 ---
 import { pb } from '../lib/pb';
 
-// CONFIGURACIÓN DE PRUEBA
+// --- DIAGNOSTICOS ---
+const diagnostics: Record<string, string> = {};
+
+// 1. Verificar token
+const token = import.meta.env.POCKETBASE_TOKEN || (typeof process !== 'undefined' ? process.env.POCKETBASE_TOKEN : undefined);
+diagnostics['POCKETBASE_TOKEN'] = token ? `Configurado (${token.substring(0, 15)}...)` : 'NO ENCONTRADO';
+diagnostics['authStore.isValid'] = String(pb.authStore.isValid);
+diagnostics['authStore.token'] = pb.authStore.token ? `Presente (${pb.authStore.token.substring(0, 15)}...)` : 'Vacio';
+diagnostics['PocketBase URL'] = 'https://a1-pocketbase.adwebcrm.com';
+diagnostics['Node ENV'] = import.meta.env.MODE || 'desconocido';
+
+// 2. Verificar conectividad con PocketBase
+let pbHealthy = false;
+let pbHealthError = '';
+try {
+    const health = await pb.health.check();
+    pbHealthy = true;
+    diagnostics['PB Health'] = `OK - code: ${health.code}`;
+} catch (e) {
+    pbHealthError = String(e);
+    diagnostics['PB Health'] = `ERROR: ${pbHealthError}`;
+}
+
+// 3. Intentar consulta real
 const TARGET_YEAR = "2026";
-// Nota: Puedes cambiar esto a 1 (Enero) o 2 (Febrero) según los datos que tengas
-const TARGET_MONTH = 2; 
+const TARGET_MONTH = 2;
 
-// 1. TRAER REGISTROS TIPO "MARCA" (Totales consolidados)
-const marcas = await pb.collection('campaign_reports').getFullList({
-    filter: `year = "${TARGET_YEAR}" && month_num = ${TARGET_MONTH} && tipo_registro = "Marca"`,
-    sort: '-created'
-});
+let marcas: any[] = [];
+let campanas: any[] = [];
+let queryError = '';
 
-// 2. TRAER REGISTROS TIPO "CAMPAÑA" (Desglose individual)
-const campañas = await pb.collection('campaign_reports').getFullList({
-    filter: `year = "${TARGET_YEAR}" && month_num = ${TARGET_MONTH} && tipo_registro = "Campaña"`,
-    sort: 'brand, -cost_total_mes'
-});
+try {
+    marcas = await pb.collection('campaign_reports').getFullList({
+        filter: `year = "${TARGET_YEAR}" && month_num = ${TARGET_MONTH} && tipo_registro = "Marca"`,
+        sort: '-created'
+    });
+    diagnostics['Query Marcas (Feb)'] = `OK - ${marcas.length} registros`;
+} catch (e) {
+    queryError = String(e);
+    diagnostics['Query Marcas (Feb)'] = `ERROR: ${queryError}`;
+}
+
+try {
+    campanas = await pb.collection('campaign_reports').getFullList({
+        filter: `year = "${TARGET_YEAR}" && month_num = ${TARGET_MONTH} && tipo_registro = "Campaña"`,
+        sort: 'brand, -cost_total_mes'
+    });
+    diagnostics['Query Campanas (Feb)'] = `OK - ${campanas.length} registros`;
+} catch (e) {
+    diagnostics['Query Campanas (Feb)'] = `ERROR: ${String(e)}`;
+}
+
+// Tambien probar con mes 1 (enero) que es lo que usa el dashboard principal
+let marcasMes1: any[] = [];
+try {
+    marcasMes1 = await pb.collection('campaign_reports').getFullList({
+        filter: `year = "${TARGET_YEAR}" && month_num = 1 && tipo_registro = "Marca"`,
+        sort: '-created'
+    });
+    diagnostics['Query Marcas (Ene)'] = `OK - ${marcasMes1.length} registros`;
+} catch (e) {
+    diagnostics['Query Marcas (Ene)'] = `ERROR: ${String(e)}`;
+}
 
 const formatter = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
 ---
@@ -25,102 +72,156 @@ const formatter = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>DEBUG DATA - A1 Marketing</title>
+    <title>DEBUG - PPC Dashboard</title>
     <style>
-        body { font-family: monospace; padding: 20px; background: #f0f0f0; }
-        h1 { color: #333; border-bottom: 2px solid #333; }
-        h2 { margin-top: 40px; background: #333; color: #fff; padding: 10px; }
-        
-        table { width: 100%; border-collapse: collapse; background: white; font-size: 12px; margin-bottom: 20px; }
-        th, td { border: 1px solid #ccc; padding: 6px; text-align: right; }
-        th { background: #eee; text-align: center; font-weight: bold; position: sticky; top: 0; }
-        td.text { text-align: left; }
-        
-        .zero { color: #ccc; }
-        .val { font-weight: bold; color: #000; }
-        
-        .debug-json { background: #222; color: #0f0; padding: 15px; overflow-x: auto; max-height: 300px; }
+        body { font-family: monospace; padding: 20px; background: #111; color: #eee; }
+        h1 { color: #0f0; border-bottom: 2px solid #0f0; padding-bottom: 10px; }
+        h2 { margin-top: 40px; background: #222; color: #0f0; padding: 10px; border-left: 4px solid #0f0; }
+
+        .diag-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+        .diag-table td { border: 1px solid #333; padding: 8px 12px; }
+        .diag-table td:first-child { font-weight: bold; color: #888; width: 220px; }
+        .ok { color: #0f0; }
+        .fail { color: #f44; font-weight: bold; }
+
+        table.data { width: 100%; border-collapse: collapse; background: #1a1a1a; font-size: 12px; margin-bottom: 20px; }
+        table.data th, table.data td { border: 1px solid #333; padding: 6px; text-align: right; }
+        table.data th { background: #222; text-align: center; font-weight: bold; color: #0f0; }
+        table.data td.text { text-align: left; color: #ccc; }
+        .zero { color: #555; }
+        .val { font-weight: bold; color: #fff; }
+
+        .debug-json { background: #0a0a0a; color: #0f0; padding: 15px; overflow-x: auto; max-height: 300px; border: 1px solid #333; }
+        .alert { background: #441111; border: 1px solid #f44; color: #faa; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        .info { background: #113311; border: 1px solid #0f0; color: #afa; padding: 15px; margin: 20px 0; border-radius: 4px; }
     </style>
 </head>
 <body>
 
-    <h1>🛠️ DEBUG MODE: Mes {TARGET_MONTH} / {TARGET_YEAR}</h1>
-    <p>Verificando estructura de datos para la vista mensual (Periodos de 5 días).</p>
+    <h1>DEBUG MODE: PPC Dashboard</h1>
+    <p>Diagnosticos de conexion y datos - {new Date().toISOString()}</p>
 
-    <h2>1. Registros Consolidados (tipo_registro = "Marca")</h2>
-    <table>
-        <thead>
+    <h2>1. Diagnosticos del Sistema</h2>
+    <table class="diag-table">
+        {Object.entries(diagnostics).map(([key, value]) => (
             <tr>
-                <th>ID</th>
-                <th>Marca</th>
-                <th>Tipo</th>
-                <th>Gasto Total</th>
-                <th>Leads Total</th>
-                <th>Cost 1-5</th>
-                <th>Cost 6-10</th>
-                <th>Cost 11-15</th>
-                <th>Cost 16-20</th>
-                <th>Cost 21-25</th>
-                <th>Cost 26-31</th>
+                <td>{key}</td>
+                <td class={value.includes('ERROR') || value.includes('NO ENCONTRADO') || value === 'false' || value === 'Vacio' ? 'fail' : 'ok'}>
+                    {value}
+                </td>
             </tr>
-        </thead>
-        <tbody>
-            {marcas.map(r => (
-                <tr>
-                    <td class="text">{r.id}</td>
-                    <td class="text"><strong>{r.brand}</strong></td>
-                    <td class="text">{r.tipo_registro}</td>
-                    <td class="val">{formatter.format(r.cost_total_mes)}</td>
-                    <td class="val">{r.leads_total_mes}</td>
-                    <td class={r.cost_01_05 ? 'val' : 'zero'}>{r.cost_01_05}</td>
-                    <td class={r.cost_06_10 ? 'val' : 'zero'}>{r.cost_06_10}</td>
-                    <td class={r.cost_11_15 ? 'val' : 'zero'}>{r.cost_11_15}</td>
-                    <td class={r.cost_16_20 ? 'val' : 'zero'}>{r.cost_16_20}</td>
-                    <td class={r.cost_21_25 ? 'val' : 'zero'}>{r.cost_21_25}</td>
-                    <td class={r.cost_26_31 ? 'val' : 'zero'}>{r.cost_26_31}</td>
-                </tr>
-            ))}
-        </tbody>
+        ))}
     </table>
 
-    <h2>2. Registros Individuales (tipo_registro = "Campaña")</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Marca</th>
-                <th>Nombre Campaña</th>
-                <th>Gasto Total</th>
-                <th>Leads</th>
-                <th>C. 1-5</th>
-                <th>C. 6-10</th>
-                <th>C. 11-15</th>
-                <th>C. 16-20</th>
-                <th>C. 21-25</th>
-                <th>C. 26-31</th>
-            </tr>
-        </thead>
-        <tbody>
-            {campañas.map(r => (
-                <tr>
-                    <td class="text">{r.brand}</td>
-                    <td class="text" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                        {r.campaign_name}
-                    </td>
-                    <td class="val">{formatter.format(r.cost_total_mes)}</td>
-                    <td>{r.leads_total_mes}</td>
-                    
-                    <td class={r.cost_01_05 ? '' : 'zero'}>{Math.round(r.cost_01_05)}</td>
-                    <td class={r.cost_06_10 ? '' : 'zero'}>{Math.round(r.cost_06_10)}</td>
-                    <td class={r.cost_11_15 ? '' : 'zero'}>{Math.round(r.cost_11_15)}</td>
-                    <td class={r.cost_16_20 ? '' : 'zero'}>{Math.round(r.cost_16_20)}</td>
-                    <td class={r.cost_21_25 ? '' : 'zero'}>{Math.round(r.cost_21_25)}</td>
-                    <td class={r.cost_26_31 ? '' : 'zero'}>{Math.round(r.cost_26_31)}</td>
-                </tr>
-            ))}
-        </tbody>
-    </table>
+    {!token && (
+        <div class="alert">
+            <strong>PROBLEMA DETECTADO:</strong> No se encontro POCKETBASE_TOKEN.<br/>
+            En CapRover, ve a tu app &gt; App Configs &gt; Environmental Variables y agrega:<br/>
+            <code>POCKETBASE_TOKEN = tu_token_aqui</code>
+        </div>
+    )}
 
-    <h2>3. RAW JSON (Un ejemplo de Marca)</h2>
+    {!pbHealthy && (
+        <div class="alert">
+            <strong>PROBLEMA DETECTADO:</strong> No se puede conectar a PocketBase.<br/>
+            Verificar que <code>https://a1-pocketbase.adwebcrm.com</code> es accesible desde el servidor.
+        </div>
+    )}
+
+    {pbHealthy && token && marcas.length === 0 && marcasMes1.length === 0 && (
+        <div class="alert">
+            <strong>PROBLEMA DETECTADO:</strong> PocketBase responde pero no hay datos.<br/>
+            Verificar que la coleccion <code>campaign_reports</code> tiene registros para year=2026 y que el token tiene permisos de lectura.
+        </div>
+    )}
+
+    {pbHealthy && token && (marcas.length > 0 || marcasMes1.length > 0) && (
+        <div class="info">
+            <strong>CONEXION OK:</strong> PocketBase responde y se encontraron datos correctamente.
+        </div>
+    )}
+
+    <h2>2. Registros Consolidados - Mes {TARGET_MONTH} / {TARGET_YEAR} (tipo_registro = "Marca")</h2>
+    {marcas.length === 0 ? (
+        <p class="fail">No se encontraron registros de marca para este periodo.</p>
+    ) : (
+        <table class="data">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Marca</th>
+                    <th>Tipo</th>
+                    <th>Gasto Total</th>
+                    <th>Leads Total</th>
+                    <th>Cost 1-5</th>
+                    <th>Cost 6-10</th>
+                    <th>Cost 11-15</th>
+                    <th>Cost 16-20</th>
+                    <th>Cost 21-25</th>
+                    <th>Cost 26-31</th>
+                </tr>
+            </thead>
+            <tbody>
+                {marcas.map(r => (
+                    <tr>
+                        <td class="text">{r.id}</td>
+                        <td class="text"><strong>{r.brand}</strong></td>
+                        <td class="text">{r.tipo_registro}</td>
+                        <td class="val">{formatter.format(r.cost_total_mes)}</td>
+                        <td class="val">{r.leads_total_mes}</td>
+                        <td class={r.cost_01_05 ? 'val' : 'zero'}>{r.cost_01_05}</td>
+                        <td class={r.cost_06_10 ? 'val' : 'zero'}>{r.cost_06_10}</td>
+                        <td class={r.cost_11_15 ? 'val' : 'zero'}>{r.cost_11_15}</td>
+                        <td class={r.cost_16_20 ? 'val' : 'zero'}>{r.cost_16_20}</td>
+                        <td class={r.cost_21_25 ? 'val' : 'zero'}>{r.cost_21_25}</td>
+                        <td class={r.cost_26_31 ? 'val' : 'zero'}>{r.cost_26_31}</td>
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    )}
+
+    <h2>3. Registros Individuales - Mes {TARGET_MONTH} / {TARGET_YEAR} (tipo_registro = "Campana")</h2>
+    {campanas.length === 0 ? (
+        <p class="fail">No se encontraron registros de campana para este periodo.</p>
+    ) : (
+        <table class="data">
+            <thead>
+                <tr>
+                    <th>Marca</th>
+                    <th>Nombre Campana</th>
+                    <th>Gasto Total</th>
+                    <th>Leads</th>
+                    <th>C. 1-5</th>
+                    <th>C. 6-10</th>
+                    <th>C. 11-15</th>
+                    <th>C. 16-20</th>
+                    <th>C. 21-25</th>
+                    <th>C. 26-31</th>
+                </tr>
+            </thead>
+            <tbody>
+                {campanas.map(r => (
+                    <tr>
+                        <td class="text">{r.brand}</td>
+                        <td class="text" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            {r.campaign_name}
+                        </td>
+                        <td class="val">{formatter.format(r.cost_total_mes)}</td>
+                        <td>{r.leads_total_mes}</td>
+                        <td class={r.cost_01_05 ? '' : 'zero'}>{Math.round(r.cost_01_05)}</td>
+                        <td class={r.cost_06_10 ? '' : 'zero'}>{Math.round(r.cost_06_10)}</td>
+                        <td class={r.cost_11_15 ? '' : 'zero'}>{Math.round(r.cost_11_15)}</td>
+                        <td class={r.cost_16_20 ? '' : 'zero'}>{Math.round(r.cost_16_20)}</td>
+                        <td class={r.cost_21_25 ? '' : 'zero'}>{Math.round(r.cost_21_25)}</td>
+                        <td class={r.cost_26_31 ? '' : 'zero'}>{Math.round(r.cost_26_31)}</td>
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    )}
+
+    <h2>4. RAW JSON (Primer registro de Marca)</h2>
     <div class="debug-json">
         <pre>{JSON.stringify(marcas[0] || "No se encontraron marcas", null, 4)}</pre>
     </div>
