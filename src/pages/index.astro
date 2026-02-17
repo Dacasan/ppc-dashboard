@@ -1,48 +1,111 @@
 ---
 import DashboardLayout from '../layouts/DashboardLayout.astro';
+import BrandsSidebar from '../components/dashboard/BrandsSidebar.astro';
+import CampaignsSidebar from '../components/dashboard/CampaignsSidebar.astro';
+import MobileSidebarContent from '../components/dashboard/MobileSidebarContent.astro';
 import GlobalKPIs from '../components/dashboard/GlobalKPIs.astro';
+import CplChart from '../components/dashboard/CplChart.astro';
 import BrandsTable from '../components/dashboard/BrandsTable.astro';
+import MobileBrands from '../components/dashboard/MobileBrands.astro';
+import MobileCampaigns from '../components/dashboard/MobileCampaigns.astro';
 import Skeleton from '../components/ui/Skeleton.astro';
+import { getGlobalStats, getAllCampaigns } from '../lib/data-service';
+
+const { activeBrands } = await getGlobalStats({ year: "2026", month: 1 });
+const campaigns = await getAllCampaigns({ year: "2026", month: 1 });
 ---
 
 <DashboardLayout title="Resumen Global | A1 Marketing">
-    
-    <section class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4">
+
+    <!-- Left sidebar (desktop only) -->
+    <BrandsSidebar slot="left-sidebar" server:defer>
+        <aside slot="fallback" class="hidden lg:block w-[280px] shrink-0 bg-white border-r border-zinc-200">
+            <div class="p-4"><Skeleton class="h-6 w-20 mb-4" /><Skeleton class="h-8 w-full mb-2" /><Skeleton class="h-8 w-full mb-2" /><Skeleton class="h-20 w-full mb-2" /><Skeleton class="h-20 w-full" /></div>
+        </aside>
+    </BrandsSidebar>
+
+    <!-- Right sidebar (desktop only) -->
+    <CampaignsSidebar slot="right-sidebar" server:defer>
+        <aside slot="fallback" class="hidden xl:block w-[320px] shrink-0 bg-white border-l border-zinc-200">
+            <div class="p-4"><Skeleton class="h-6 w-32 mb-4" /><Skeleton class="h-28 w-full mb-2" /><Skeleton class="h-28 w-full mb-2" /><Skeleton class="h-28 w-full" /></div>
+        </aside>
+    </CampaignsSidebar>
+
+    <!-- Mobile sidebar content -->
+    <MobileSidebarContent slot="mobile-sidebar" server:defer>
+        <div slot="fallback" class="p-4"><Skeleton class="h-12 w-full mb-2" /><Skeleton class="h-12 w-full mb-2" /><Skeleton class="h-12 w-full" /></div>
+    </MobileSidebarContent>
+
+    <!-- ===== CENTER CONTENT ===== -->
+
+    <!-- Page header -->
+    <section class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
         <div>
-            <h1 class="text-2xl md:text-3xl font-black text-zinc-900 tracking-tight">Resumen Global</h1>
-            <p class="text-zinc-500 text-sm mt-1 font-medium">
-                Vista general de todas las cuentas activas
+            <h1 class="text-xl md:text-2xl font-black text-zinc-900 tracking-tight">
+                Resumen Global <span class="text-zinc-400 font-medium">—</span> <span class="text-zinc-500 font-bold">Enero 2026</span>
+            </h1>
+            <p class="text-zinc-400 text-xs mt-1 font-medium">
+                {activeBrands} marcas · {campaigns.length} campañas activas
             </p>
         </div>
         <div class="flex gap-2">
-            <span class="px-3 py-1.5 text-xs font-bold bg-white border border-zinc-300 rounded-lg shadow-sm text-zinc-700 flex items-center gap-2">
-                <span class="w-2 h-2 bg-green-500 rounded-full"></span>
-                Enero 2026
+            <span class="px-3 py-1.5 text-[11px] font-semibold bg-white border border-zinc-200 rounded-lg text-zinc-600 flex items-center gap-2 shadow-sm">
+                <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                En vivo
             </span>
         </div>
     </section>
 
+    <!-- Mobile brands (horizontal scroll) -->
+    <MobileBrands server:defer>
+        <div slot="fallback" class="lg:hidden flex gap-2.5 overflow-x-auto pb-2 -mx-4 px-4">
+            <Skeleton class="h-24 w-[160px] shrink-0 rounded-xl" />
+            <Skeleton class="h-24 w-[160px] shrink-0 rounded-xl" />
+            <Skeleton class="h-24 w-[160px] shrink-0 rounded-xl" />
+        </div>
+    </MobileBrands>
+
+    <!-- KPI Cards -->
     <GlobalKPIs server:defer>
-        <div slot="fallback" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <Skeleton class="h-32 w-full rounded-xl" />
-            <Skeleton class="h-32 w-full rounded-xl" />
-            <Skeleton class="h-32 w-full rounded-xl" />
-            <Skeleton class="h-32 w-full rounded-xl" />
+        <div slot="fallback" class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Skeleton class="h-28 w-full rounded-xl" />
+            <Skeleton class="h-28 w-full rounded-xl" />
+            <Skeleton class="h-28 w-full rounded-xl" />
+            <Skeleton class="h-28 w-full rounded-xl" />
         </div>
     </GlobalKPIs>
 
-    <BrandsTable server:defer>
-        <div slot="fallback" class="bg-white border border-zinc-200 rounded-xl p-6">
-            <div class="flex justify-between mb-6">
-                <Skeleton class="h-6 w-32" />
-                <Skeleton class="h-6 w-20" />
+    <!-- CPL Chart -->
+    <CplChart server:defer>
+        <div slot="fallback" class="bg-white border border-zinc-200 rounded-xl p-5">
+            <Skeleton class="h-6 w-32 mb-4" />
+            <div class="space-y-3">
+                <Skeleton class="h-6 w-full" />
+                <Skeleton class="h-6 w-3/4" />
+                <Skeleton class="h-6 w-1/2" />
             </div>
-            <div class="space-y-4">
+        </div>
+    </CplChart>
+
+    <!-- Brands Table -->
+    <BrandsTable server:defer>
+        <div slot="fallback" class="bg-white border border-zinc-200 rounded-xl p-5">
+            <Skeleton class="h-6 w-40 mb-4" />
+            <div class="space-y-3">
                 <Skeleton class="h-10 w-full" />
                 <Skeleton class="h-10 w-full" />
                 <Skeleton class="h-10 w-full" />
             </div>
         </div>
     </BrandsTable>
+
+    <!-- Mobile campaigns (below xl) -->
+    <MobileCampaigns server:defer>
+        <div slot="fallback" class="xl:hidden space-y-2">
+            <Skeleton class="h-6 w-32 mb-2" />
+            <Skeleton class="h-28 w-full rounded-xl" />
+            <Skeleton class="h-28 w-full rounded-xl" />
+        </div>
+    </MobileCampaigns>
 
 </DashboardLayout>

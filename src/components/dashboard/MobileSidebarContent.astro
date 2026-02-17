@@ -1,0 +1,57 @@
+---
+import { getUniqueBrands } from '../../lib/api';
+import { getBrandsRanking } from '../../lib/data-service';
+import { formatMoney } from '../../lib/format';
+
+const brands = await getUniqueBrands();
+const records = await getBrandsRanking({ year: "2026", month: 1 });
+
+const brandDataMap = new Map(
+  records.map(r => [r.brand || r.nombre_cuenta, r])
+);
+
+const currentPath = Astro.url.pathname;
+---
+
+<div class="p-3 flex flex-col gap-2">
+  <!-- Dashboard Global link -->
+  <a href="/" class:list={[
+    "flex items-center gap-3 p-3 rounded-xl border transition-colors",
+    currentPath === '/' ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50'
+  ]}>
+    <span class="text-xl">📊</span>
+    <span class="font-semibold text-sm">Dashboard Global</span>
+  </a>
+
+  <div class="h-px bg-zinc-200 my-1"></div>
+
+  <h3 class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider px-1">Marcas ({brands.length})</h3>
+
+  {brands.map(brand => {
+    const data = brandDataMap.get(brand.name);
+    const gasto = data?.cost_total_mes || 0;
+    const leads = data?.leads_total_mes || 0;
+    const isActive = currentPath.includes(`/dashboard/${brand.slug}`);
+
+    return (
+      <a href={`/dashboard/${brand.slug}`} class="block">
+        <div class:list={[
+          "p-3 rounded-xl border transition-colors",
+          isActive ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-white border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50'
+        ]}>
+          <div class="flex items-center gap-2.5 mb-1.5">
+            <span class:list={[
+              "w-8 h-8 rounded-lg flex items-center justify-center text-base",
+              isActive ? 'bg-zinc-700' : 'bg-zinc-100'
+            ]}>{brand.emoji}</span>
+            <span class:list={["font-semibold text-sm", isActive ? 'text-white' : 'text-zinc-800']}>{brand.name}</span>
+          </div>
+          <div class:list={["flex gap-4 text-[11px]", isActive ? 'text-zinc-400' : 'text-zinc-500']}>
+            <span>Gasto: <span class:list={["font-semibold", isActive ? 'text-zinc-200' : 'text-zinc-700']}>{formatMoney(gasto)}</span></span>
+            <span>Leads: <span class:list={["font-semibold", isActive ? 'text-zinc-200' : 'text-zinc-700']}>{leads}</span></span>
+          </div>
+        </div>
+      </a>
+    );
+  })}
+</div>

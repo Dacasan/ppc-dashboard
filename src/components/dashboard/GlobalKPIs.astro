@@ -3,51 +3,65 @@ import { getGlobalStats } from '../../lib/data-service';
 import { formatMoney, formatNumber } from '../../lib/format';
 
 const { totalSpend, totalLeads, avgCPL } = await getGlobalStats({ year: "2026", month: 1 });
-const roas = 3.4; 
+const roas = 3.4;
 ---
 
-<div class="flex md:grid md:grid-cols-4 gap-4 mb-4 overflow-x-auto snap-x snap-mandatory pb-4 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0 no-scrollbar">
-    
-    <div class="min-w-[85%] md:min-w-0 snap-center bg-white p-5 rounded-xl border border-zinc-200 shadow-sm flex flex-col justify-between h-32 relative overflow-hidden shrink-0">
-        <span class="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Gasto Global</span>
-        <div>
-            <span class="text-3xl font-black text-zinc-900 tracking-tight">{formatMoney(totalSpend)}</span>
-            <div class="text-xs font-medium text-emerald-600 mt-1 flex items-center gap-1">
-                <i class="fa-solid fa-arrow-trend-up"></i> 12.3% vs mes ant.
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+
+    <!-- Gasto Total -->
+    <div class="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm flex flex-col gap-1">
+        <div class="flex items-center gap-2 mb-1">
+            <div class="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
+                <i class="fa-solid fa-wallet text-blue-500 text-xs"></i>
             </div>
+            <span class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Gasto Total</span>
         </div>
-        <div class="absolute -right-4 -bottom-4 text-zinc-50 opacity-50 pointer-events-none">
-            <i class="fa-solid fa-wallet text-8xl"></i>
+        <span class="text-2xl font-black text-zinc-900 tracking-tight">{formatMoney(totalSpend)}</span>
+        <div class="text-[11px] font-medium text-emerald-600 flex items-center gap-1">
+            <i class="fa-solid fa-arrow-up text-[9px]"></i> 12.3% vs mes ant.
         </div>
     </div>
 
-    <div class="min-w-[85%] md:min-w-0 snap-center bg-white p-5 rounded-xl border border-zinc-200 shadow-sm flex flex-col justify-between h-32 shrink-0">
-        <span class="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Leads Globales</span>
-        <div>
-            <span class="text-3xl font-black text-zinc-900 tracking-tight">{formatNumber(totalLeads)}</span>
-            <div class="text-xs font-medium text-emerald-600 mt-1 flex items-center gap-1">
-                <i class="fa-solid fa-arrow-trend-up"></i> 8.7% vs mes ant.
+    <!-- Leads Totales -->
+    <div class="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm flex flex-col gap-1">
+        <div class="flex items-center gap-2 mb-1">
+            <div class="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
+                <i class="fa-solid fa-users text-emerald-500 text-xs"></i>
             </div>
+            <span class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Leads Totales</span>
+        </div>
+        <span class="text-2xl font-black text-zinc-900 tracking-tight">{formatNumber(totalLeads)}</span>
+        <div class="text-[11px] font-medium text-emerald-600 flex items-center gap-1">
+            <i class="fa-solid fa-arrow-up text-[9px]"></i> 8.7% vs mes ant.
         </div>
     </div>
 
-    <div class="min-w-[85%] md:min-w-0 snap-center bg-white p-5 rounded-xl border border-zinc-200 shadow-sm flex flex-col justify-between h-32 shrink-0">
-        <span class="text-[10px] font-bold uppercase tracking-widest text-zinc-400">CPL Promedio</span>
-        <div>
-            <span class="text-3xl font-black text-zinc-900 tracking-tight">{formatMoney(avgCPL)}</span>
-            <div class="text-xs font-medium text-rose-500 mt-1 flex items-center gap-1">
-                <i class="fa-solid fa-arrow-trend-up"></i> 3.1% vs mes ant.
+    <!-- CPL Promedio -->
+    <div class="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm flex flex-col gap-1">
+        <div class="flex items-center gap-2 mb-1">
+            <div class="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center">
+                <i class="fa-solid fa-chart-line text-amber-500 text-xs"></i>
             </div>
+            <span class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">CPL Promedio</span>
+        </div>
+        <span class="text-2xl font-black text-zinc-900 tracking-tight">{formatMoney(avgCPL)}</span>
+        <div class="text-[11px] font-medium text-rose-500 flex items-center gap-1">
+            <i class="fa-solid fa-arrow-up text-[9px]"></i> 3.1% vs mes ant.
         </div>
     </div>
 
-    <div class="min-w-[85%] md:min-w-0 snap-center bg-white p-5 rounded-xl border border-zinc-200 shadow-sm flex flex-col justify-between h-32 shrink-0">
-        <span class="text-[10px] font-bold uppercase tracking-widest text-zinc-400">ROAS Est.</span>
-        <div>
-            <span class="text-3xl font-black text-zinc-900 tracking-tight">{roas}x</span>
-            <div class="w-full bg-zinc-100 h-1.5 rounded-full mt-2 overflow-hidden">
-                <div class="bg-purple-500 h-full w-[85%]"></div>
+    <!-- ROAS Promedio -->
+    <div class="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm flex flex-col gap-1">
+        <div class="flex items-center gap-2 mb-1">
+            <div class="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center">
+                <i class="fa-solid fa-chart-pie text-purple-500 text-xs"></i>
             </div>
+            <span class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">ROAS Promedio</span>
+        </div>
+        <span class="text-2xl font-black text-zinc-900 tracking-tight">{roas}x</span>
+        <div class="w-full bg-zinc-100 h-1.5 rounded-full mt-1 overflow-hidden">
+            <div class="bg-purple-500 h-full rounded-full" style="width: 85%"></div>
         </div>
     </div>
+
 </div>

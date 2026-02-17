@@ -1,0 +1,56 @@
+---
+import { getBrandsRanking } from '../../lib/data-service';
+import { formatMoney, getCplColor } from '../../lib/format';
+import { getUniqueBrands } from '../../lib/api';
+
+const records = await getBrandsRanking({ year: "2026", month: 1 });
+const uniqueBrands = await getUniqueBrands();
+const getEmoji = (name: string) => uniqueBrands.find(b => name.includes(b.name))?.emoji || '📊';
+
+// Calculate CPL for each brand and find max for bar scaling
+const brandsWithCpl = records.map(r => ({
+  name: r.brand || r.nombre_cuenta,
+  emoji: getEmoji(r.brand || r.nombre_cuenta),
+  cpl: r.leads_total_mes > 0 ? r.cost_total_mes / r.leads_total_mes : 0,
+  spend: r.cost_total_mes,
+  leads: r.leads_total_mes
+}));
+
+const maxCpl = Math.max(...brandsWithCpl.map(b => b.cpl), 1);
+---
+
+<div class="bg-white border border-zinc-200 rounded-xl shadow-sm overflow-hidden">
+  <div class="p-5 border-b border-zinc-100 flex items-center justify-between">
+    <h3 class="font-bold text-zinc-800">CPL por Marca</h3>
+    <div class="flex rounded-lg border border-zinc-200 overflow-hidden text-[11px]">
+      <button class="px-3 py-1 bg-zinc-900 text-white font-medium">CPL</button>
+      <button class="px-3 py-1 bg-white text-zinc-500 font-medium hover:bg-zinc-50">Gasto</button>
+      <button class="px-3 py-1 bg-white text-zinc-500 font-medium hover:bg-zinc-50">Leads</button>
+    </div>
+  </div>
+
+  <div class="p-5 flex flex-col gap-3">
+    {brandsWithCpl.map(brand => {
+      const barWidth = maxCpl > 0 ? (brand.cpl / maxCpl) * 100 : 0;
+      const isGood = brand.cpl < 800;
+      const isMedium = brand.cpl >= 800 && brand.cpl < 1200;
+      const barColor = isGood ? 'bg-emerald-500' : isMedium ? 'bg-amber-500' : 'bg-rose-500';
+
+      return (
+        <div class="flex items-center gap-3">
+          <div class="w-28 shrink-0 flex items-center gap-2">
+            <span class="text-base">{brand.emoji}</span>
+            <span class="text-xs font-medium text-zinc-700 truncate">{brand.name}</span>
+          </div>
+          <div class="flex-1 h-6 bg-zinc-100 rounded-full overflow-hidden relative">
+            <div
+              class={`h-full rounded-full ${barColor} transition-all duration-500`}
+              style={`width: ${barWidth}%`}
+            ></div>
+          </div>
+          <span class="text-xs font-bold text-zinc-700 w-20 text-right">{formatMoney(brand.cpl)}</span>
+        </div>
+      );
+    })}
+  </div>
+</div>

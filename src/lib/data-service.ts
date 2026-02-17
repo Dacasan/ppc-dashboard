@@ -47,6 +47,20 @@ export async function getBrandsRanking({ year, month }: DateFilter) {
   }
 }
 
+// --- 1b. TODAS LAS CAMPAÑAS (Sidebar derecho) ---
+
+export async function getAllCampaigns({ year, month }: DateFilter) {
+  try {
+    return await pb.collection('campaign_reports').getFullList<CampaignReport>({
+      filter: `year = "${year}" && month_num = ${month} && tipo_registro = "Campaña"`,
+      sort: '-cost_total_mes'
+    });
+  } catch (error) {
+    console.error('[DataService] Error en getAllCampaigns:', error);
+    return [];
+  }
+}
+
 // --- 2. DATOS DE MARCA (Dashboard Detalle) ---
 
 export async function getBrandFullData(brandSlug: string, { year, month }: DateFilter) {
