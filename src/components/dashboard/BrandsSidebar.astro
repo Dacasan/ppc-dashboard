@@ -1,0 +1,78 @@
+---
+import { getUniqueBrands } from '../../lib/api';
+import { getBrandsRanking } from '../../lib/data-service';
+import { formatMoney, formatNumber } from '../../lib/format';
+
+const brands = await getUniqueBrands();
+const records = await getBrandsRanking({ year: "2026", month: 1 });
+
+// Create a map of brand data for quick lookup
+const brandDataMap = new Map(
+  records.map(r => [r.brand || r.nombre_cuenta, r])
+);
+---
+
+<aside class="hidden lg:flex flex-col w-[280px] shrink-0 bg-white border-r border-zinc-200 h-full overflow-hidden">
+
+  <div class="p-4 border-b border-zinc-100">
+    <h2 class="font-bold text-zinc-800 text-base mb-3">Marcas</h2>
+
+    <!-- Platform filter pills -->
+    <div class="flex flex-wrap gap-1.5 mb-3">
+      <button class="px-3 py-1 rounded-full bg-zinc-900 text-white text-[11px] font-medium">Todas</button>
+      <button class="px-3 py-1 rounded-full bg-zinc-100 text-zinc-600 text-[11px] font-medium hover:bg-zinc-200 transition">Google Ads</button>
+      <button class="px-3 py-1 rounded-full bg-zinc-100 text-zinc-600 text-[11px] font-medium hover:bg-zinc-200 transition">Meta Ads</button>
+      <button class="px-3 py-1 rounded-full bg-zinc-100 text-zinc-600 text-[11px] font-medium hover:bg-zinc-200 transition">TikTok</button>
+    </div>
+
+    <!-- Estado filter -->
+    <div class="relative">
+      <select class="w-full text-xs border border-zinc-200 rounded-lg px-3 py-2 bg-white text-zinc-600 appearance-none cursor-pointer hover:border-zinc-300 transition">
+        <option>Estado: Todas</option>
+        <option>Activa</option>
+        <option>Pausada</option>
+      </select>
+      <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 text-[10px] pointer-events-none"></i>
+    </div>
+  </div>
+
+  <!-- Brand cards list -->
+  <div class="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
+    {brands.map(brand => {
+      const data = brandDataMap.get(brand.name);
+      const gasto = data?.cost_total_mes || 0;
+      const leads = data?.leads_total_mes || 0;
+
+      return (
+        <a href={`/dashboard/${brand.slug}`} class="block group">
+          <div class="p-3 rounded-xl border border-zinc-200 hover:border-zinc-300 hover:shadow-sm bg-white transition-all">
+            <div class="flex items-center gap-2.5 mb-2">
+              <div class="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center text-base">
+                {brand.emoji}
+              </div>
+              <span class="font-semibold text-sm text-zinc-800 truncate">{brand.name}</span>
+            </div>
+
+            <div class="flex items-center gap-4 text-[11px] text-zinc-500">
+              <div>
+                <span class="text-zinc-400">Gasto:</span>{' '}
+                <span class="font-semibold text-zinc-700">{formatMoney(gasto)}</span>
+              </div>
+              <div>
+                <span class="text-zinc-400">Leads:</span>{' '}
+                <span class="font-semibold text-zinc-700">{leads}</span>
+              </div>
+            </div>
+
+            <div class="flex justify-end mt-2">
+              <div class="flex rounded-md border border-zinc-200 overflow-hidden text-[10px]">
+                <button class="px-2 py-0.5 bg-zinc-900 text-white font-medium">Mes</button>
+                <button class="px-2 py-0.5 bg-white text-zinc-500 font-medium hover:bg-zinc-50">Año</button>
+              </div>
+            </div>
+          </div>
+        </a>
+      );
+    })}
+  </div>
+</aside>

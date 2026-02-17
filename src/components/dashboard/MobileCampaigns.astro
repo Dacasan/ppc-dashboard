@@ -1,0 +1,59 @@
+---
+import { getAllCampaigns } from '../../lib/data-service';
+import { formatMoney, getChannelInfo } from '../../lib/format';
+
+const campaigns = await getAllCampaigns({ year: "2026", month: 1 });
+---
+
+<!-- Mobile campaigns section (visible only below xl) -->
+<div class="xl:hidden">
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="font-bold text-sm text-zinc-700">Campañas activas</h2>
+    <span class="text-[11px] text-zinc-400">{campaigns.length} total</span>
+  </div>
+
+  <div class="flex flex-col gap-2.5">
+    {campaigns.slice(0, 8).map((camp) => {
+      const cpl = camp.leads_total_mes > 0 ? camp.cost_total_mes / camp.leads_total_mes : 0;
+      const channel = getChannelInfo(camp.campaign_name || '');
+      const channelLetter = channel.name === 'Google Ads' ? 'G' : channel.name === 'Meta Ads' ? 'M' : channel.name === 'TikTok' ? 'T' : '?';
+      const channelBg = channel.name === 'Google Ads' ? 'bg-blue-500' : channel.name === 'Meta Ads' ? 'bg-sky-500' : channel.name === 'TikTok' ? 'bg-zinc-800' : 'bg-zinc-400';
+
+      return (
+        <div class="p-3 rounded-xl border border-zinc-200 bg-white">
+          <div class="flex items-start gap-2.5 mb-2">
+            <div class={`w-7 h-7 rounded-lg ${channelBg} text-white flex items-center justify-center text-xs font-bold shrink-0`}>
+              {channelLetter}
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="font-semibold text-sm text-zinc-800 truncate">{camp.campaign_name}</p>
+              <p class="text-[11px] text-zinc-400">{camp.brand || camp.nombre_cuenta} · Ene 2026</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-2 mb-2">
+            <div class="text-center">
+              <p class="text-[10px] text-zinc-400 uppercase">Gasto</p>
+              <p class="text-xs font-bold text-zinc-700">{formatMoney(camp.cost_total_mes)}</p>
+            </div>
+            <div class="text-center border-x border-zinc-100">
+              <p class="text-[10px] text-zinc-400 uppercase">Leads</p>
+              <p class="text-xs font-bold text-zinc-700">{camp.leads_total_mes}</p>
+            </div>
+            <div class="text-center">
+              <p class="text-[10px] text-zinc-400 uppercase">CPL</p>
+              <p class="text-xs font-bold text-zinc-700">{formatMoney(cpl)}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-600 border border-blue-100">
+              CTR {(Math.random() * 3 + 1).toFixed(1)}%
+            </span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-600 border border-emerald-100">
+              Activa
+            </span>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+</div>
