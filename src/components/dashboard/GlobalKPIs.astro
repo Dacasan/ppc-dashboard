@@ -2,7 +2,13 @@
 import { getGlobalStats } from '../../lib/data-service';
 import { formatMoney, formatNumber } from '../../lib/format';
 
-const { totalSpend, totalLeads, avgCPL } = await getGlobalStats({ year: "2026", month: 1 });
+interface Props {
+  year?: string;
+  month?: number;
+}
+
+const { year = "2026", month = 1 } = Astro.props;
+const { totalSpend, totalLeads, avgCPL } = await getGlobalStats({ year, month });
 const roas = 3.4;
 ---
 

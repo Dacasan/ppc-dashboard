@@ -11,21 +11,32 @@ import MobileCampaigns from '../components/dashboard/MobileCampaigns.astro';
 import Skeleton from '../components/ui/Skeleton.astro';
 import { getGlobalStats, getAllCampaigns } from '../lib/data-service';
 
-const { activeBrands } = await getGlobalStats({ year: "2026", month: 1 });
-const campaigns = await getAllCampaigns({ year: "2026", month: 1 });
+// Read month/year from URL params, defaulting to January 2026
+const url = Astro.url;
+const monthParam = parseInt(url.searchParams.get('month') || '1');
+const yearParam = url.searchParams.get('year') || '2026';
+const month = isNaN(monthParam) || monthParam < 1 || monthParam > 12 ? 1 : monthParam;
+const year = yearParam;
+
+const MONTH_NAMES = [
+  '', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+];
+const { activeBrands } = await getGlobalStats({ year, month });
+const campaigns = await getAllCampaigns({ year, month });
 ---
 
 <DashboardLayout title="Resumen Global | A1 Marketing">
 
     <!-- Left sidebar (desktop only) -->
-    <BrandsSidebar slot="left-sidebar" server:defer>
+    <BrandsSidebar slot="left-sidebar" year={year} month={month} server:defer>
         <aside slot="fallback" class="hidden lg:block w-[280px] shrink-0 bg-white border-r border-zinc-200">
             <div class="p-4"><Skeleton class="h-6 w-20 mb-4" /><Skeleton class="h-8 w-full mb-2" /><Skeleton class="h-8 w-full mb-2" /><Skeleton class="h-20 w-full mb-2" /><Skeleton class="h-20 w-full" /></div>
         </aside>
     </BrandsSidebar>
 
     <!-- Right sidebar (desktop only) -->
-    <CampaignsSidebar slot="right-sidebar" server:defer>
+    <CampaignsSidebar slot="right-sidebar" year={year} month={month} server:defer>
         <aside slot="fallback" class="hidden xl:block w-[320px] shrink-0 bg-white border-l border-zinc-200">
             <div class="p-4"><Skeleton class="h-6 w-32 mb-4" /><Skeleton class="h-28 w-full mb-2" /><Skeleton class="h-28 w-full mb-2" /><Skeleton class="h-28 w-full" /></div>
         </aside>
@@ -41,9 +52,25 @@ const campaigns = await getAllCampaigns({ year: "2026", month: 1 });
     <!-- Page header -->
     <section class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
         <div>
-            <h1 class="text-xl md:text-2xl font-black text-zinc-900 tracking-tight">
-                Resumen Global <span class="text-zinc-400 font-medium">—</span> <span class="text-zinc-500 font-bold">Enero 2026</span>
-            </h1>
+            <div class="flex items-center gap-3 flex-wrap">
+                <h1 class="text-2xl md:text-3xl font-black text-zinc-900 tracking-tight">
+                    Resumen Global
+                </h1>
+                <span class="text-zinc-300 font-light text-2xl md:text-3xl">—</span>
+                <!-- Month dropdown selector -->
+                <div class="relative">
+                    <select
+                        id="month-selector"
+                        class="appearance-none text-2xl md:text-3xl font-black text-blue-600 bg-transparent border-none cursor-pointer pr-8 focus:outline-none hover:text-blue-700 transition-colors"
+                    >
+                        {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => (
+                            <option value={m} selected={m === month}>{MONTH_NAMES[m]}</option>
+                        ))}
+                    </select>
+                    <i class="fa-solid fa-chevron-down absolute right-1 top-1/2 -translate-y-1/2 text-blue-500 text-sm pointer-events-none"></i>
+                </div>
+                <span class="text-2xl md:text-3xl font-black text-zinc-500">{year}</span>
+            </div>
             <p class="text-zinc-400 text-xs mt-1 font-medium">
                 {activeBrands} marcas · {campaigns.length} campañas activas
             </p>
@@ -57,7 +84,7 @@ const campaigns = await getAllCampaigns({ year: "2026", month: 1 });
     </section>
 
     <!-- Mobile brands (horizontal scroll) -->
-    <MobileBrands server:defer>
+    <MobileBrands year={year} month={month} server:defer>
         <div slot="fallback" class="lg:hidden flex gap-2.5 overflow-x-auto pb-2 -mx-4 px-4">
             <Skeleton class="h-24 w-[160px] shrink-0 rounded-xl" />
             <Skeleton class="h-24 w-[160px] shrink-0 rounded-xl" />
@@ -66,7 +93,7 @@ const campaigns = await getAllCampaigns({ year: "2026", month: 1 });
     </MobileBrands>
 
     <!-- KPI Cards -->
-    <GlobalKPIs server:defer>
+    <GlobalKPIs year={year} month={month} server:defer>
         <div slot="fallback" class="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Skeleton class="h-28 w-full rounded-xl" />
             <Skeleton class="h-28 w-full rounded-xl" />
@@ -76,7 +103,7 @@ const campaigns = await getAllCampaigns({ year: "2026", month: 1 });
     </GlobalKPIs>
 
     <!-- CPL Chart -->
-    <CplChart server:defer>
+    <CplChart year={year} month={month} server:defer>
         <div slot="fallback" class="bg-white border border-zinc-200 rounded-xl p-5">
             <Skeleton class="h-6 w-32 mb-4" />
             <div class="space-y-3">
@@ -88,7 +115,7 @@ const campaigns = await getAllCampaigns({ year: "2026", month: 1 });
     </CplChart>
 
     <!-- Brands Table -->
-    <BrandsTable server:defer>
+    <BrandsTable year={year} month={month} server:defer>
         <div slot="fallback" class="bg-white border border-zinc-200 rounded-xl p-5">
             <Skeleton class="h-6 w-40 mb-4" />
             <div class="space-y-3">
@@ -100,7 +127,7 @@ const campaigns = await getAllCampaigns({ year: "2026", month: 1 });
     </BrandsTable>
 
     <!-- Mobile campaigns (below xl) -->
-    <MobileCampaigns server:defer>
+    <MobileCampaigns year={year} month={month} server:defer>
         <div slot="fallback" class="xl:hidden space-y-2">
             <Skeleton class="h-6 w-32 mb-2" />
             <Skeleton class="h-28 w-full rounded-xl" />
@@ -109,3 +136,18 @@ const campaigns = await getAllCampaigns({ year: "2026", month: 1 });
     </MobileCampaigns>
 
 </DashboardLayout>
+
+<script>
+    function initMonthSelector() {
+        const sel = document.getElementById('month-selector') as HTMLSelectElement | null;
+        if (!sel) return;
+        sel.addEventListener('change', () => {
+            const url = new URL(window.location.href);
+            url.searchParams.set('month', sel.value);
+            window.location.href = url.toString();
+        });
+    }
+
+    initMonthSelector();
+    document.addEventListener('astro:after-swap', initMonthSelector);
+</script>

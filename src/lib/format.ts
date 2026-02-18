@@ -1,10 +1,11 @@
 // 1. Formatear Dinero (MXN sin decimales)
 export const formatMoney = (amount: number | undefined) => {
-  return new Intl.NumberFormat('es-MX', {
+  const num = new Intl.NumberFormat('es-MX', {
     style: 'currency',
     currency: 'MXN',
     maximumFractionDigits: 0,
   }).format(amount || 0);
+  return `${num} MXN`;
 };
 
 // 2. Formatear Números (1,234)

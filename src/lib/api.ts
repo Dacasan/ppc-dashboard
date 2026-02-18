@@ -12,9 +12,9 @@ export async function getUniqueBrands(): Promise<BrandOption[]> {
   try {
     // Pedimos los últimos 100 registros para escanear marcas recientes
     // Usamos 'fields' para traer SOLO el nombre de la marca y ahorrar datos
-    const records = await pb.collection('campaign_reports').getList(1, 100, {
+    const records = await pb.collection('campaign_reports').getList(1, 500, {
       sort: '-created',
-      fields: 'brand, nombre_cuenta', 
+      fields: 'brand, nombre_cuenta',
     });
 
     // Filtramos nombres únicos usando un Set

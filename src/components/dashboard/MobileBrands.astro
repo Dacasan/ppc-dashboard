@@ -3,8 +3,14 @@ import { getUniqueBrands } from '../../lib/api';
 import { getBrandsRanking } from '../../lib/data-service';
 import { formatMoney } from '../../lib/format';
 
+interface Props {
+  year?: string;
+  month?: number;
+}
+
+const { year = "2026", month = 1 } = Astro.props;
 const brands = await getUniqueBrands();
-const records = await getBrandsRanking({ year: "2026", month: 1 });
+const records = await getBrandsRanking({ year, month });
 
 const brandDataMap = new Map(
   records.map(r => [r.brand || r.nombre_cuenta, r])
@@ -25,18 +31,22 @@ const brandDataMap = new Map(
       const leads = data?.leads_total_mes || 0;
 
       return (
-        <a href={`/dashboard/${brand.slug}`} class="snap-start shrink-0 w-[160px]">
-          <div class="p-3 rounded-xl border border-zinc-200 bg-white hover:border-zinc-300 hover:shadow-sm transition-all">
+        <div class="snap-start shrink-0 w-[170px] p-3 rounded-xl border border-zinc-200 bg-white hover:border-zinc-300 hover:shadow-sm transition-all">
+          <a href={`/dashboard/${brand.slug}`} class="block mb-2">
             <div class="flex items-center gap-2 mb-2">
-              <span class="w-7 h-7 rounded-lg bg-zinc-100 flex items-center justify-center text-sm">{brand.emoji}</span>
+              <span class="w-7 h-7 rounded-lg bg-zinc-100 flex items-center justify-center text-sm">🦷</span>
               <span class="font-semibold text-xs text-zinc-800 truncate">{brand.name}</span>
             </div>
             <div class="text-[10px] text-zinc-500 space-y-0.5">
               <div>Gasto: <span class="font-semibold text-zinc-700">{formatMoney(gasto)}</span></div>
               <div>Leads: <span class="font-semibold text-zinc-700">{leads}</span></div>
             </div>
+          </a>
+          <div class="flex rounded-md border border-zinc-200 overflow-hidden text-[10px]">
+            <a href={`/dashboard/${brand.slug}`} class="flex-1 text-center py-0.5 bg-zinc-900 text-white font-medium">Mes</a>
+            <a href={`/dashboard/${brand.slug}/year`} class="flex-1 text-center py-0.5 bg-white text-zinc-500 font-medium hover:bg-zinc-50">Año</a>
           </div>
-        </a>
+        </div>
       );
     })}
   </div>

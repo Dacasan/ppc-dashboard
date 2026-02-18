@@ -2,7 +2,13 @@
 import { getAllCampaigns } from '../../lib/data-service';
 import { formatMoney, getChannelInfo } from '../../lib/format';
 
-const campaigns = await getAllCampaigns({ year: "2026", month: 1 });
+interface Props {
+  year?: string;
+  month?: number;
+}
+
+const { year = "2026", month = 1 } = Astro.props;
+const campaigns = await getAllCampaigns({ year, month });
 ---
 
 <!-- Mobile campaigns section (visible only below xl) -->

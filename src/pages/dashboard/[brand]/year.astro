@@ -1,0 +1,149 @@
+---
+import DashboardLayout from '../../../layouts/DashboardLayout.astro';
+import BrandsSidebar from '../../../components/dashboard/BrandsSidebar.astro';
+import MobileSidebarContent from '../../../components/dashboard/MobileSidebarContent.astro';
+import Skeleton from '../../../components/ui/Skeleton.astro';
+import { getUniqueBrands } from '../../../lib/api';
+import { getBrandYearData } from '../../../lib/data-service';
+import { formatMoney, formatNumber, getCplColor } from '../../../lib/format';
+
+export const prerender = false;
+const { brand } = Astro.params;
+
+const brands = await getUniqueBrands();
+const currentBrand = brands.find(b => b.slug === brand);
+if (!currentBrand) return Astro.redirect('/');
+
+const url = Astro.url;
+const year = url.searchParams.get('year') || '2026';
+
+const { totalSpend, totalLeads, avgCPL, monthlyReports } = await getBrandYearData(currentBrand.name, { year });
+
+const MONTH_NAMES: Record<number, string> = {
+  1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
+  5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto',
+  9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
+};
+---
+
+<DashboardLayout title={`Resumen Anual | ${currentBrand.name}`}>
+
+    <!-- Left sidebar -->
+    <BrandsSidebar slot="left-sidebar" year={year} month={1} server:defer>
+        <aside slot="fallback" class="hidden lg:block w-[280px] shrink-0 bg-white border-r border-zinc-200">
+            <div class="p-4"><Skeleton class="h-6 w-20 mb-4" /><Skeleton class="h-20 w-full mb-2" /><Skeleton class="h-20 w-full" /></div>
+        </aside>
+    </BrandsSidebar>
+
+    <!-- Mobile sidebar content -->
+    <MobileSidebarContent slot="mobile-sidebar" server:defer>
+        <div slot="fallback" class="p-4"><Skeleton class="h-12 w-full mb-2" /><Skeleton class="h-12 w-full" /></div>
+    </MobileSidebarContent>
+
+    <!-- Center content -->
+    <div class="flex flex-col gap-6">
+        <header class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-white border border-zinc-200 rounded-xl flex items-center justify-center text-2xl shadow-sm">
+                    🦷
+                </div>
+                <div>
+                    <h1 class="text-xl md:text-2xl font-bold text-zinc-900 leading-none">{currentBrand.name}</h1>
+                    <p class="text-xs text-zinc-400 mt-1">Resumen Anual {year}</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href={`/dashboard/${currentBrand.slug}`} class="inline-flex items-center gap-2 text-xs font-medium px-3 py-2 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50 transition">
+                    <i class="fa-solid fa-calendar-day"></i> <span class="hidden sm:inline">Ver Mes</span>
+                </a>
+                <a href="/" class="inline-flex items-center gap-2 text-xs font-medium px-3 py-2 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50 transition">
+                    <i class="fa-solid fa-arrow-left"></i> <span class="hidden sm:inline">Volver</span>
+                </a>
+            </div>
+        </header>
+
+        <!-- Annual KPI summary -->
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div class="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm flex flex-col gap-1">
+                <div class="flex items-center gap-2 mb-1">
+                    <div class="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
+                        <i class="fa-solid fa-wallet text-blue-500 text-xs"></i>
+                    </div>
+                    <span class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Gasto Anual</span>
+                </div>
+                <span class="text-2xl font-black text-zinc-900 tracking-tight">{formatMoney(totalSpend)}</span>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm flex flex-col gap-1">
+                <div class="flex items-center gap-2 mb-1">
+                    <div class="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
+                        <i class="fa-solid fa-users text-emerald-500 text-xs"></i>
+                    </div>
+                    <span class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Leads Anuales</span>
+                </div>
+                <span class="text-2xl font-black text-zinc-900 tracking-tight">{formatNumber(totalLeads)}</span>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm flex flex-col gap-1 col-span-2 md:col-span-1">
+                <div class="flex items-center gap-2 mb-1">
+                    <div class="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center">
+                        <i class="fa-solid fa-chart-line text-amber-500 text-xs"></i>
+                    </div>
+                    <span class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">CPL Promedio</span>
+                </div>
+                <span class="text-2xl font-black text-zinc-900 tracking-tight">{formatMoney(avgCPL)}</span>
+            </div>
+        </div>
+
+        <!-- Monthly breakdown table -->
+        {monthlyReports.length > 0 ? (
+            <div class="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
+                <div class="px-5 py-4 border-b border-zinc-100 bg-zinc-50 flex justify-between items-center">
+                    <h3 class="font-bold text-sm text-zinc-700">Desglose Mensual {year}</h3>
+                    <span class="text-xs text-zinc-400">{monthlyReports.length} meses con datos</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm whitespace-nowrap">
+                        <thead class="bg-zinc-50 text-zinc-400 text-[10px] uppercase font-bold border-b border-zinc-100">
+                            <tr>
+                                <th class="px-6 py-3 text-left">Mes</th>
+                                <th class="px-6 py-3 text-right">Gasto MXN</th>
+                                <th class="px-6 py-3 text-right">Leads</th>
+                                <th class="px-6 py-3 text-right">CPL MXN</th>
+                                <th class="px-6 py-3 text-center">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-zinc-100">
+                            {monthlyReports.map((row) => {
+                                const cpl = row.leads_total_mes > 0 ? row.cost_total_mes / row.leads_total_mes : 0;
+                                const mesNombre = MONTH_NAMES[row.month_num] || `Mes ${row.month_num}`;
+                                return (
+                                    <tr class="hover:bg-zinc-50/50 transition-colors">
+                                        <td class="px-6 py-3 font-semibold text-zinc-700">{mesNombre}</td>
+                                        <td class="px-6 py-3 text-right font-mono text-zinc-600">{formatMoney(row.cost_total_mes)}</td>
+                                        <td class="px-6 py-3 text-right font-bold text-zinc-900">{row.leads_total_mes}</td>
+                                        <td class="px-6 py-3 text-right font-mono text-xs">
+                                            <span class={`px-2 py-1 rounded border ${getCplColor(cpl)}`}>
+                                                {formatMoney(cpl)}
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-3 text-center">
+                                            <a
+                                                href={`/dashboard/${currentBrand.slug}?month=${row.month_num}&year=${year}`}
+                                                class="text-[11px] text-blue-600 font-medium hover:underline"
+                                            >
+                                                Ver detalle
+                                            </a>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        ) : (
+            <div class="p-4 border border-yellow-200 bg-yellow-50 text-yellow-800 rounded-lg text-sm">
+                Sin datos anuales para {currentBrand.name} en {year}.
+            </div>
+        )}
+    </div>
+</DashboardLayout>

@@ -1,56 +1,129 @@
 ---
 import { getBrandsRanking } from '../../lib/data-service';
-import { formatMoney, getCplColor } from '../../lib/format';
-import { getUniqueBrands } from '../../lib/api';
+import { formatMoney } from '../../lib/format';
 
-const records = await getBrandsRanking({ year: "2026", month: 1 });
-const uniqueBrands = await getUniqueBrands();
-const getEmoji = (name: string) => uniqueBrands.find(b => name.includes(b.name))?.emoji || '📊';
+interface Props {
+  year?: string;
+  month?: number;
+}
 
-// Calculate CPL for each brand and find max for bar scaling
-const brandsWithCpl = records.map(r => ({
+const { year = "2026", month = 1 } = Astro.props;
+const records = await getBrandsRanking({ year, month });
+
+const brandsData = records.map(r => ({
   name: r.brand || r.nombre_cuenta,
-  emoji: getEmoji(r.brand || r.nombre_cuenta),
   cpl: r.leads_total_mes > 0 ? r.cost_total_mes / r.leads_total_mes : 0,
   spend: r.cost_total_mes,
   leads: r.leads_total_mes
 }));
 
-const maxCpl = Math.max(...brandsWithCpl.map(b => b.cpl), 1);
+const maxCpl = Math.max(...brandsData.map(b => b.cpl), 1);
+const maxSpend = Math.max(...brandsData.map(b => b.spend), 1);
+const maxLeads = Math.max(...brandsData.map(b => b.leads), 1);
 ---
 
 <div class="bg-white border border-zinc-200 rounded-xl shadow-sm overflow-hidden">
   <div class="p-5 border-b border-zinc-100 flex items-center justify-between">
     <h3 class="font-bold text-zinc-800">CPL por Marca</h3>
-    <div class="flex rounded-lg border border-zinc-200 overflow-hidden text-[11px]">
-      <button class="px-3 py-1 bg-zinc-900 text-white font-medium">CPL</button>
-      <button class="px-3 py-1 bg-white text-zinc-500 font-medium hover:bg-zinc-50">Gasto</button>
-      <button class="px-3 py-1 bg-white text-zinc-500 font-medium hover:bg-zinc-50">Leads</button>
+    <div class="flex rounded-lg border border-zinc-200 overflow-hidden text-[11px]" id="cpl-chart-tabs">
+      <button data-metric="cpl" class="px-3 py-1 bg-zinc-900 text-white font-medium cpl-tab-btn">CPL</button>
+      <button data-metric="gasto" class="px-3 py-1 bg-white text-zinc-500 font-medium hover:bg-zinc-50 cpl-tab-btn">Gasto</button>
+      <button data-metric="leads" class="px-3 py-1 bg-white text-zinc-500 font-medium hover:bg-zinc-50 cpl-tab-btn">Leads</button>
     </div>
   </div>
 
   <div class="p-5 flex flex-col gap-3">
-    {brandsWithCpl.map(brand => {
-      const barWidth = maxCpl > 0 ? (brand.cpl / maxCpl) * 100 : 0;
+    {brandsData.map((brand, i) => {
+      const cplBarWidth = maxCpl > 0 ? (brand.cpl / maxCpl) * 100 : 0;
+      const spendBarWidth = maxSpend > 0 ? (brand.spend / maxSpend) * 100 : 0;
+      const leadsBarWidth = maxLeads > 0 ? (brand.leads / maxLeads) * 100 : 0;
+
       const isGood = brand.cpl < 800;
       const isMedium = brand.cpl >= 800 && brand.cpl < 1200;
-      const barColor = isGood ? 'bg-emerald-500' : isMedium ? 'bg-amber-500' : 'bg-rose-500';
+      const cplBarColor = isGood ? 'bg-emerald-500' : isMedium ? 'bg-amber-500' : 'bg-rose-500';
 
       return (
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3" data-brand-row={i}>
           <div class="w-28 shrink-0 flex items-center gap-2">
-            <span class="text-base">{brand.emoji}</span>
+            <span class="text-base">🦷</span>
             <span class="text-xs font-medium text-zinc-700 truncate">{brand.name}</span>
           </div>
-          <div class="flex-1 h-6 bg-zinc-100 rounded-full overflow-hidden relative">
-            <div
-              class={`h-full rounded-full ${barColor} transition-all duration-500`}
-              style={`width: ${barWidth}%`}
-            ></div>
+          <div class="flex-1 relative h-6">
+            <!-- CPL bar -->
+            <div class="metric-bar absolute inset-0" data-metric-bar="cpl">
+              <div class="h-full bg-zinc-100 rounded-full overflow-hidden">
+                <div class={`h-full rounded-full ${cplBarColor} transition-all duration-500`} style={`width: ${cplBarWidth}%`}></div>
+              </div>
+            </div>
+            <!-- Gasto bar -->
+            <div class="metric-bar absolute inset-0 hidden" data-metric-bar="gasto">
+              <div class="h-full bg-zinc-100 rounded-full overflow-hidden">
+                <div class="h-full rounded-full bg-blue-500 transition-all duration-500" style={`width: ${spendBarWidth}%`}></div>
+              </div>
+            </div>
+            <!-- Leads bar -->
+            <div class="metric-bar absolute inset-0 hidden" data-metric-bar="leads">
+              <div class="h-full bg-zinc-100 rounded-full overflow-hidden">
+                <div class="h-full rounded-full bg-purple-500 transition-all duration-500" style={`width: ${leadsBarWidth}%`}></div>
+              </div>
+            </div>
           </div>
-          <span class="text-xs font-bold text-zinc-700 w-20 text-right">{formatMoney(brand.cpl)}</span>
+          <div class="w-24 text-right">
+            <span class="metric-value text-xs font-bold text-zinc-700" data-cpl={formatMoney(brand.cpl)} data-gasto={formatMoney(brand.spend)} data-leads={String(brand.leads)}>
+              {formatMoney(brand.cpl)}
+            </span>
+          </div>
         </div>
       );
     })}
   </div>
 </div>
+
+<script>
+  function initCplChart() {
+    const tabs = document.querySelectorAll('.cpl-tab-btn');
+    let currentMetric = 'cpl';
+
+    function setMetric(metric: string) {
+      currentMetric = metric;
+
+      // Update tab styles
+      tabs.forEach(btn => {
+        const btnMetric = (btn as HTMLElement).dataset.metric;
+        if (btnMetric === metric) {
+          btn.classList.remove('bg-white', 'text-zinc-500');
+          btn.classList.add('bg-zinc-900', 'text-white');
+        } else {
+          btn.classList.remove('bg-zinc-900', 'text-white');
+          btn.classList.add('bg-white', 'text-zinc-500');
+        }
+      });
+
+      // Update bars
+      document.querySelectorAll('[data-metric-bar]').forEach(bar => {
+        const barMetric = (bar as HTMLElement).dataset.metricBar;
+        if (barMetric === metric) {
+          bar.classList.remove('hidden');
+        } else {
+          bar.classList.add('hidden');
+        }
+      });
+
+      // Update values
+      document.querySelectorAll('.metric-value').forEach(val => {
+        const el = val as HTMLElement;
+        el.textContent = el.dataset[metric] || '';
+      });
+    }
+
+    tabs.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const metric = (btn as HTMLElement).dataset.metric || 'cpl';
+        setMetric(metric);
+      });
+    });
+  }
+
+  initCplChart();
+  document.addEventListener('astro:after-swap', initCplChart);
+</script>

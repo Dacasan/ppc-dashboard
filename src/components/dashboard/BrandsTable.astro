@@ -3,11 +3,17 @@ import { getBrandsRanking } from '../../lib/data-service';
 import { formatMoney, getCplColor } from '../../lib/format';
 import { getUniqueBrands } from '../../lib/api';
 
-const records = await getBrandsRanking({ year: "2026", month: 1 });
+interface Props {
+  year?: string;
+  month?: number;
+}
+
+const { year = "2026", month = 1 } = Astro.props;
+const records = await getBrandsRanking({ year, month });
 
 const uniqueBrands = await getUniqueBrands();
-const getEmoji = (name: string) => uniqueBrands.find(b => name.includes(b.name))?.emoji || '📊';
-const getSlug = (name: string) => uniqueBrands.find(b => name.includes(b.name))?.slug || '#';
+const getSlug = (name: string) => uniqueBrands.find(b => name.includes(b.name) || b.name.includes(name))?.slug
+  || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 ---
 
 <div class="bg-white border border-zinc-200 rounded-xl shadow-sm overflow-hidden">
@@ -26,7 +32,7 @@ const getSlug = (name: string) => uniqueBrands.find(b => name.includes(b.name))?
                     <th class="px-4 py-2.5 font-semibold">Marca</th>
                     <th class="px-4 py-2.5 text-right font-semibold">Gasto MXN</th>
                     <th class="px-4 py-2.5 text-right font-semibold">Leads</th>
-                    <th class="px-4 py-2.5 text-right font-semibold">CPL</th>
+                    <th class="px-4 py-2.5 text-right font-semibold">CPL MXN</th>
                     <th class="px-4 py-2.5 text-right font-semibold">CTR</th>
                     <th class="px-4 py-2.5 text-center font-semibold">Estado</th>
                 </tr>
@@ -35,14 +41,15 @@ const getSlug = (name: string) => uniqueBrands.find(b => name.includes(b.name))?
                 {records.map((brand) => {
                     const cpl = brand.leads_total_mes > 0 ? brand.cost_total_mes / brand.leads_total_mes : 0;
                     const ctr = (Math.random() * 3 + 1).toFixed(1);
+                    const brandName = brand.brand || brand.nombre_cuenta;
                     return (
                         <tr class="hover:bg-zinc-50/50 transition-colors group">
                             <td class="px-4 py-3 font-medium text-zinc-900">
-                                <a href={`/dashboard/${getSlug(brand.brand || brand.nombre_cuenta)}`} class="flex items-center gap-2.5 hover:text-blue-600 transition-colors">
+                                <a href={`/dashboard/${getSlug(brandName)}`} class="flex items-center gap-2.5 hover:text-blue-600 transition-colors">
                                     <span class="w-7 h-7 rounded-lg bg-zinc-100 flex items-center justify-center text-sm shrink-0">
-                                        {getEmoji(brand.brand || brand.nombre_cuenta)}
+                                        🦷
                                     </span>
-                                    <span class="text-sm truncate">{brand.brand || brand.nombre_cuenta}</span>
+                                    <span class="text-sm truncate">{brandName}</span>
                                 </a>
                             </td>
                             <td class="px-4 py-3 text-right text-sm text-zinc-600 font-mono">{formatMoney(brand.cost_total_mes)}</td>
