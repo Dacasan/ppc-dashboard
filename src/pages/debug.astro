@@ -307,12 +307,12 @@ const pageLoadEnd = Date.now();
                         <td class="text">{r.tipo_registro}</td>
                         <td class="val">{formatter.format(r.cost_total_mes)}</td>
                         <td class="val">{r.leads_total_mes}</td>
-                        <td class={r.cost_01_05 ? 'val' : 'zero'}>{r.cost_01_05}</td>
-                        <td class={r.cost_06_10 ? 'val' : 'zero'}>{r.cost_06_10}</td>
-                        <td class={r.cost_11_15 ? 'val' : 'zero'}>{r.cost_11_15}</td>
-                        <td class={r.cost_16_20 ? 'val' : 'zero'}>{r.cost_16_20}</td>
-                        <td class={r.cost_21_25 ? 'val' : 'zero'}>{r.cost_21_25}</td>
-                        <td class={r.cost_26_31 ? 'val' : 'zero'}>{r.cost_26_31}</td>
+                        <td class={r.cost_01_05 ? 'val' : 'zero'}>{formatter.format(r.cost_01_05)}</td>
+                        <td class={r.cost_06_10 ? 'val' : 'zero'}>{formatter.format(r.cost_06_10)}</td>
+                        <td class={r.cost_11_15 ? 'val' : 'zero'}>{formatter.format(r.cost_11_15)}</td>
+                        <td class={r.cost_16_20 ? 'val' : 'zero'}>{formatter.format(r.cost_16_20)}</td>
+                        <td class={r.cost_21_25 ? 'val' : 'zero'}>{formatter.format(r.cost_21_25)}</td>
+                        <td class={r.cost_26_31 ? 'val' : 'zero'}>{formatter.format(r.cost_26_31)}</td>
                     </tr>
                 ))}
             </tbody>
@@ -348,12 +348,12 @@ const pageLoadEnd = Date.now();
                         </td>
                         <td class="val">{formatter.format(r.cost_total_mes)}</td>
                         <td>{r.leads_total_mes}</td>
-                        <td class={r.cost_01_05 ? '' : 'zero'}>{Math.round(r.cost_01_05)}</td>
-                        <td class={r.cost_06_10 ? '' : 'zero'}>{Math.round(r.cost_06_10)}</td>
-                        <td class={r.cost_11_15 ? '' : 'zero'}>{Math.round(r.cost_11_15)}</td>
-                        <td class={r.cost_16_20 ? '' : 'zero'}>{Math.round(r.cost_16_20)}</td>
-                        <td class={r.cost_21_25 ? '' : 'zero'}>{Math.round(r.cost_21_25)}</td>
-                        <td class={r.cost_26_31 ? '' : 'zero'}>{Math.round(r.cost_26_31)}</td>
+                        <td class={r.cost_01_05 ? '' : 'zero'}>{formatter.format(r.cost_01_05)}</td>
+                        <td class={r.cost_06_10 ? '' : 'zero'}>{formatter.format(r.cost_06_10)}</td>
+                        <td class={r.cost_11_15 ? '' : 'zero'}>{formatter.format(r.cost_11_15)}</td>
+                        <td class={r.cost_16_20 ? '' : 'zero'}>{formatter.format(r.cost_16_20)}</td>
+                        <td class={r.cost_21_25 ? '' : 'zero'}>{formatter.format(r.cost_21_25)}</td>
+                        <td class={r.cost_26_31 ? '' : 'zero'}>{formatter.format(r.cost_26_31)}</td>
                     </tr>
                 ))}
             </tbody>
