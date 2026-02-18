@@ -31,14 +31,14 @@ const currentPath = Astro.url.pathname;
     const data = brandDataMap.get(brand.name);
     const gasto = data?.cost_total_mes || 0;
     const leads = data?.leads_total_mes || 0;
-    const isActive = currentPath.includes(`/dashboard/${brand.slug}`);
+    const isActive = currentPath.startsWith(`/${brand.slug}`);
 
     return (
       <div class:list={[
         "p-3 rounded-xl border transition-colors",
         isActive ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-white border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50'
       ]}>
-        <a href={`/dashboard/${brand.slug}`} class="block mb-2">
+        <a href={`/${brand.slug}`} class="block mb-2">
           <div class="flex items-center gap-2.5 mb-1.5">
             <span class:list={[
               "w-8 h-8 rounded-lg flex items-center justify-center text-base",
@@ -52,8 +52,8 @@ const currentPath = Astro.url.pathname;
           </div>
         </a>
         <div class="flex rounded-md border border-zinc-200 overflow-hidden text-[10px]">
-          <a href={`/dashboard/${brand.slug}`} class="flex-1 text-center py-0.5 bg-zinc-900 text-white font-medium">Mes</a>
-          <a href={`/dashboard/${brand.slug}/year`} class="flex-1 text-center py-0.5 bg-white text-zinc-500 font-medium hover:bg-zinc-50">Año</a>
+          <a href={`/${brand.slug}`} class="flex-1 text-center py-0.5 bg-zinc-900 text-white font-medium">Mes</a>
+          <a href={`/${brand.slug}/year`} class="flex-1 text-center py-0.5 bg-white text-zinc-500 font-medium hover:bg-zinc-50">Año</a>
         </div>
       </div>
     );

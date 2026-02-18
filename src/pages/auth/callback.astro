@@ -1,0 +1,56 @@
+---
+import PocketBase from 'pocketbase';
+
+// Only handle GET requests with the OAuth callback params
+const code = Astro.url.searchParams.get('code');
+const state = Astro.url.searchParams.get('state');
+
+const savedCodeVerifier = Astro.cookies.get('oauth_code_verifier')?.value;
+const savedState = Astro.cookies.get('oauth_state')?.value;
+
+// Basic validation
+if (!code || !savedCodeVerifier) {
+  return Astro.redirect('/login?error=missing_params');
+}
+
+if (state !== savedState) {
+  return Astro.redirect('/login?error=invalid_state');
+}
+
+// Exchange authorization code for PocketBase auth token
+const pb = new PocketBase('https://a1-pocketbase.adwebcrm.com');
+pb.autoCancellation(false);
+
+try {
+  const redirectUrl = `${Astro.url.origin}/auth/callback`;
+
+  await pb.collection('users').authWithOAuth2Code(
+    'google',
+    code,
+    savedCodeVerifier,
+    redirectUrl,
+  );
+
+  if (!pb.authStore.isValid) {
+    throw new Error('Auth store invalid after exchange');
+  }
+
+  // Persist auth token in HTTP-only cookie (7 days)
+  Astro.cookies.set('pb_auth', pb.authStore.token, {
+    httpOnly: true,
+    secure: Astro.url.protocol === 'https:',
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 24 * 7,
+    path: '/',
+  });
+
+  // Clean up temporary OAuth cookies
+  Astro.cookies.delete('oauth_code_verifier', { path: '/' });
+  Astro.cookies.delete('oauth_state', { path: '/' });
+
+  return Astro.redirect('/');
+} catch (e) {
+  console.error('[Callback] OAuth exchange failed:', e);
+  return Astro.redirect('/login?error=auth_failed');
+}
+---

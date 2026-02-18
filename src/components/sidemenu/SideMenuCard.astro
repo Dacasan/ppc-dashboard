@@ -8,11 +8,11 @@ interface Props {
 const { brand } = Astro.props;
 const currentPath = Astro.url.pathname;
 // Verificamos si la URL actual contiene el slug de esta marca
-const isActive = currentPath.includes(`/dashboard/${brand.slug}`);
+const isActive = currentPath.startsWith(`/${brand.slug}`);
 ---
 
 <a 
-  href={`/dashboard/${brand.slug}`} 
+  href={`/${brand.slug}`}
   class="block group relative transition-all hover:scale-[1.02] active:scale-95"
 >
     <div class:list={[

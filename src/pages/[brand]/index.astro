@@ -73,7 +73,7 @@ const { brandReport, campaigns } = await getBrandFullData(currentBrand.name, { y
                 <!-- View toggle: Mes / Año -->
                 <div class="flex rounded-md border border-zinc-200 overflow-hidden text-xs">
                     <span class="px-3 py-1.5 bg-zinc-900 text-white font-medium">Mes</span>
-                    <a href={`/dashboard/${currentBrand.slug}/year?year=${year}`} class="px-3 py-1.5 bg-white text-zinc-500 font-medium hover:bg-zinc-50 transition">Año</a>
+                    <a href={`/${currentBrand.slug}/year?year=${year}`} class="px-3 py-1.5 bg-white text-zinc-500 font-medium hover:bg-zinc-50 transition">Año</a>
                 </div>
                 <a href="/" class="inline-flex items-center gap-2 text-xs font-medium px-3 py-2 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50 transition">
                     <i class="fa-solid fa-arrow-left"></i> <span class="hidden sm:inline">Volver</span>
