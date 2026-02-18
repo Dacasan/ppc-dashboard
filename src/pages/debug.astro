@@ -3,6 +3,7 @@ import { pb } from '../lib/pb';
 
 // --- DIAGNOSTICOS ---
 const diagnostics: Record<string, string> = {};
+const pageLoadStart = Date.now();
 
 // 1. Verificar token
 const token = import.meta.env.POCKETBASE_TOKEN || (typeof process !== 'undefined' ? process.env.POCKETBASE_TOKEN : undefined);
@@ -65,24 +66,102 @@ try {
     diagnostics['Query Marcas (Ene)'] = `ERROR: ${String(e)}`;
 }
 
-const formatter = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
+// --- SECTION 5: GLOBAL AUDIT ---
+// Query the single GLOBAL row (tipo_registro = "Marca" && brand = "GLOBAL")
+let globalRecord: any = null;
+try {
+    const globalRecords = await pb.collection('campaign_reports').getFullList({
+        filter: `year = "${TARGET_YEAR}" && month_num = ${TARGET_MONTH} && tipo_registro = "Marca" && brand = "GLOBAL"`,
+    });
+    globalRecord = globalRecords.length > 0 ? globalRecords[0] : null;
+    diagnostics['Query GLOBAL'] = globalRecords.length > 0 ? `OK - ${globalRecords.length} registro(s)` : 'No encontrado (puede que no exista fila GLOBAL)';
+} catch (e) {
+    diagnostics['Query GLOBAL'] = `ERROR: ${String(e)}`;
+}
+
+// --- SECTION 6: ACCOUNTS CONSOLIDATED ---
+let cuentas: any[] = [];
+try {
+    cuentas = await pb.collection('campaign_reports').getFullList({
+        filter: `year = "${TARGET_YEAR}" && month_num = ${TARGET_MONTH} && tipo_registro = "Cuenta"`,
+        sort: '-cost_total_mes'
+    });
+    diagnostics['Query Cuentas (Feb)'] = `OK - ${cuentas.length} registros`;
+} catch (e) {
+    diagnostics['Query Cuentas (Feb)'] = `ERROR: ${String(e)}`;
+}
+
+// --- SECTION 7: BRAND CONSOLIDATED (non-GLOBAL) ---
+const marcasSinGlobal = marcas.filter((r: any) => r.brand !== 'GLOBAL');
+
+// --- SECTION 10: ALL RECORDS FOR INTEGRITY CHECK ---
+let allRecords: any[] = [];
+let dbQueryStart = 0;
+let dbQueryEnd = 0;
+try {
+    dbQueryStart = Date.now();
+    allRecords = await pb.collection('campaign_reports').getFullList({
+        filter: `year = "${TARGET_YEAR}" && month_num = ${TARGET_MONTH}`,
+        sort: '-updated'
+    });
+    dbQueryEnd = Date.now();
+    diagnostics['Query ALL records (Feb)'] = `OK - ${allRecords.length} registros en ${dbQueryEnd - dbQueryStart}ms`;
+} catch (e) {
+    dbQueryEnd = Date.now();
+    diagnostics['Query ALL records (Feb)'] = `ERROR: ${String(e)}`;
+}
+
+// Compute integrity metrics
+const latestUpdated = allRecords.length > 0 ? allRecords[0].updated : null;
+const latestUpdatedDate = latestUpdated ? new Date(latestUpdated) : null;
+const now = new Date();
+const timeSinceUpdate = latestUpdatedDate ? Math.round((now.getTime() - latestUpdatedDate.getTime()) / 1000 / 60) : null;
+
+// Check semana fields (5-day period labels)
+const costPeriodFields = ['cost_01_05', 'cost_06_10', 'cost_11_15', 'cost_16_20', 'cost_21_25', 'cost_26_31'];
+const leadPeriodFields = ['leads_01_05', 'leads_06_10', 'leads_11_15', 'leads_16_20', 'leads_21_25', 'leads_26_31'];
+const periodLabels = ['1-5', '6-10', '11-15', '16-20', '21-25', '26-31'];
+
+// Check if semana string fields exist in the data
+const sampleRecord = allRecords.length > 0 ? allRecords[0] : null;
+const semanaFields = ['semana_01_05', 'semana_06_10', 'semana_11_15', 'semana_16_20', 'semana_21_25', 'semana_26_31'];
+const semanaPresent = sampleRecord ? semanaFields.map(f => ({ field: f, value: sampleRecord[f] || null, present: f in sampleRecord })) : [];
+
+// Unique tipo_registro values
+const tipoRegistroSet = new Set(allRecords.map((r: any) => r.tipo_registro));
+
+// Formatter
+const formatter = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 });
+const formatMoney = (v: number) => `${formatter.format(v || 0)} MXN`;
+const formatCpl = (cost: number, leads: number) => leads > 0 ? formatMoney(cost / leads) : 'N/A';
+const formatCplRaw = (cost: number, leads: number) => leads > 0 ? Math.round(cost / leads) : null;
+
+// Compute totals from marcas (brands) to cross-validate against GLOBAL
+const computedTotalSpend = marcasSinGlobal.reduce((sum: number, r: any) => sum + (r.cost_total_mes || 0), 0);
+const computedTotalLeads = marcasSinGlobal.reduce((sum: number, r: any) => sum + (r.leads_total_mes || 0), 0);
+
+const pageLoadEnd = Date.now();
 ---
 
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>DEBUG - PPC Dashboard</title>
+    <title>DEBUG - PPC Dashboard - Investment X-Ray</title>
     <style>
-        body { font-family: monospace; padding: 20px; background: #111; color: #eee; }
-        h1 { color: #0f0; border-bottom: 2px solid #0f0; padding-bottom: 10px; }
-        h2 { margin-top: 40px; background: #222; color: #0f0; padding: 10px; border-left: 4px solid #0f0; }
+        * { box-sizing: border-box; }
+        body { font-family: monospace; padding: 20px; background: #111; color: #eee; max-width: 1600px; margin: 0 auto; }
+        h1 { color: #0f0; border-bottom: 2px solid #0f0; padding-bottom: 10px; font-size: 20px; }
+        h2 { margin-top: 40px; background: #222; color: #0f0; padding: 10px; border-left: 4px solid #0f0; font-size: 14px; }
+        h3 { color: #0f0; margin-top: 25px; font-size: 13px; border-bottom: 1px solid #333; padding-bottom: 6px; }
+        p { font-size: 13px; line-height: 1.5; }
 
         .diag-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-        .diag-table td { border: 1px solid #333; padding: 8px 12px; }
+        .diag-table td { border: 1px solid #333; padding: 8px 12px; font-size: 12px; }
         .diag-table td:first-child { font-weight: bold; color: #888; width: 220px; }
         .ok { color: #0f0; }
         .fail { color: #f44; font-weight: bold; }
+        .warn { color: #ff0; }
 
         table.data { width: 100%; border-collapse: collapse; background: #1a1a1a; font-size: 12px; margin-bottom: 20px; }
         table.data th, table.data td { border: 1px solid #333; padding: 6px; text-align: right; }
@@ -90,18 +169,76 @@ const formatter = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 
         table.data td.text { text-align: left; color: #ccc; }
         .zero { color: #555; }
         .val { font-weight: bold; color: #fff; }
+        .warn-cell { color: #ff0; font-weight: bold; }
 
-        .debug-json { background: #0a0a0a; color: #0f0; padding: 15px; overflow-x: auto; max-height: 300px; border: 1px solid #333; }
-        .alert { background: #441111; border: 1px solid #f44; color: #faa; padding: 15px; margin: 20px 0; border-radius: 4px; }
-        .info { background: #113311; border: 1px solid #0f0; color: #afa; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        .debug-json { background: #0a0a0a; color: #0f0; padding: 15px; overflow-x: auto; max-height: 400px; border: 1px solid #333; font-size: 11px; margin-bottom: 20px; }
+        .alert { background: #441111; border: 1px solid #f44; color: #faa; padding: 15px; margin: 20px 0; border-radius: 4px; font-size: 13px; }
+        .info { background: #113311; border: 1px solid #0f0; color: #afa; padding: 15px; margin: 20px 0; border-radius: 4px; font-size: 13px; }
+        .warn-box { background: #332a00; border: 1px solid #ff0; color: #ffa; padding: 15px; margin: 20px 0; border-radius: 4px; font-size: 13px; }
+
+        /* Logic table */
+        table.logic { width: 100%; border-collapse: collapse; background: #1a1a1a; font-size: 12px; margin-bottom: 20px; }
+        table.logic th, table.logic td { border: 1px solid #333; padding: 8px 10px; text-align: left; }
+        table.logic th { background: #222; color: #0f0; text-align: center; }
+        table.logic td.metric { color: #0ff; font-weight: bold; width: 160px; }
+        table.logic td.formula { color: #ff0; font-family: monospace; }
+        table.logic td.result { color: #fff; font-weight: bold; }
+
+        /* Tab system for Section 9 */
+        .tab-container { margin-bottom: 20px; }
+        .tab-buttons { display: flex; gap: 0; margin-bottom: 0; }
+        .tab-btn { background: #1a1a1a; color: #666; border: 1px solid #333; border-bottom: none; padding: 8px 16px; cursor: pointer; font-family: monospace; font-size: 12px; transition: all 0.2s; }
+        .tab-btn:hover { color: #0f0; background: #222; }
+        .tab-btn.active { color: #0f0; background: #0a0a0a; border-color: #0f0; font-weight: bold; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Integrity check table */
+        table.integrity { width: 100%; border-collapse: collapse; background: #1a1a1a; font-size: 12px; margin-bottom: 20px; }
+        table.integrity th, table.integrity td { border: 1px solid #333; padding: 8px 12px; }
+        table.integrity th { background: #222; color: #0f0; text-align: center; width: 200px; }
+        table.integrity td.label { color: #888; font-weight: bold; width: 200px; }
+        table.integrity td.value { color: #fff; }
+        table.integrity td.ok { color: #0f0; }
+        table.integrity td.warn { color: #ff0; }
+        table.integrity td.fail { color: #f44; font-weight: bold; }
+
+        /* Section nav */
+        .section-nav { background: #1a1a1a; border: 1px solid #333; padding: 12px; margin-bottom: 30px; display: flex; flex-wrap: wrap; gap: 8px; }
+        .section-nav a { color: #0f0; text-decoration: none; font-size: 11px; padding: 4px 10px; border: 1px solid #333; background: #222; transition: all 0.2s; }
+        .section-nav a:hover { background: #0f0; color: #111; }
+
+        /* Global audit highlight */
+        .global-row { background: #0a1a0a !important; }
+        .global-row td { border-color: #0f0 !important; }
+
+        /* Cross-validation */
+        .match { color: #0f0; }
+        .mismatch { color: #f44; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <h1>DEBUG MODE: PPC Dashboard</h1>
-    <p>Diagnosticos de conexion y datos - {new Date().toISOString()}</p>
+    <h1>DEBUG MODE: PPC Dashboard - Investment X-Ray</h1>
+    <p>Diagnosticos de conexion, datos y validacion integral - {new Date().toISOString()}</p>
+    <p style="color: #666;">Periodo objetivo: Mes {TARGET_MONTH} / {TARGET_YEAR} | Page render: {pageLoadEnd - pageLoadStart}ms</p>
 
-    <h2>1. Diagnosticos del Sistema</h2>
+    <!-- Section Navigation -->
+    <div class="section-nav">
+        <a href="#s1">[1] Sistema</a>
+        <a href="#s2">[2] Marcas</a>
+        <a href="#s3">[3] Campanas</a>
+        <a href="#s4">[4] RAW JSON</a>
+        <a href="#s5">[5] Global Audit</a>
+        <a href="#s6">[6] Cuentas</a>
+        <a href="#s7">[7] Brands Drill</a>
+        <a href="#s8">[8] Formulas</a>
+        <a href="#s9">[9] JSON Samples</a>
+        <a href="#s10">[10] Integridad</a>
+    </div>
+
+    <!-- ==================== SECTION 1: DIAGNOSTICS ==================== -->
+    <h2 id="s1">1. Diagnosticos del Sistema</h2>
     <table class="diag-table">
         {Object.entries(diagnostics).map(([key, value]) => (
             <tr>
@@ -141,7 +278,8 @@ const formatter = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 
         </div>
     )}
 
-    <h2>2. Registros Consolidados - Mes {TARGET_MONTH} / {TARGET_YEAR} (tipo_registro = "Marca")</h2>
+    <!-- ==================== SECTION 2: BRAND RECORDS ==================== -->
+    <h2 id="s2">2. Registros Consolidados - Mes {TARGET_MONTH} / {TARGET_YEAR} (tipo_registro = "Marca")</h2>
     {marcas.length === 0 ? (
         <p class="fail">No se encontraron registros de marca para este periodo.</p>
     ) : (
@@ -181,7 +319,8 @@ const formatter = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 
         </table>
     )}
 
-    <h2>3. Registros Individuales - Mes {TARGET_MONTH} / {TARGET_YEAR} (tipo_registro = "Campana")</h2>
+    <!-- ==================== SECTION 3: CAMPAIGN RECORDS ==================== -->
+    <h2 id="s3">3. Registros Individuales - Mes {TARGET_MONTH} / {TARGET_YEAR} (tipo_registro = "Campana")</h2>
     {campanas.length === 0 ? (
         <p class="fail">No se encontraron registros de campana para este periodo.</p>
     ) : (
@@ -221,10 +360,601 @@ const formatter = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 
         </table>
     )}
 
-    <h2>4. RAW JSON (Primer registro de Marca)</h2>
+    <!-- ==================== SECTION 4: RAW JSON (original) ==================== -->
+    <h2 id="s4">4. RAW JSON (Primer registro de Marca)</h2>
     <div class="debug-json">
         <pre>{JSON.stringify(marcas[0] || "No se encontraron marcas", null, 4)}</pre>
     </div>
+
+    <!-- ==================== SECTION 5: TOTAL GLOBAL AUDIT (Level 4) ==================== -->
+    <h2 id="s5">5. TOTAL GLOBAL AUDIT (Level 4) - tipo_registro = "Marca" &amp;&amp; brand = "GLOBAL"</h2>
+    <p style="color: #888;">El registro GLOBAL representa el corazon de todo el sistema. Es la fila unica que suma todo el gasto e inversion.</p>
+
+    {globalRecord ? (
+        <Fragment>
+            <table class="data">
+                <thead>
+                    <tr>
+                        <th>Unique Key</th>
+                        <th>Total Spend</th>
+                        <th>Cost 1-5</th>
+                        <th>Cost 6-10</th>
+                        <th>Cost 11-15</th>
+                        <th>Cost 16-20</th>
+                        <th>Cost 21-25</th>
+                        <th>Cost 26-31</th>
+                        <th>Total Leads</th>
+                        <th>CPL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="global-row">
+                        <td class="text"><strong>MARCA|GLOBAL|{TARGET_MONTH}|{TARGET_YEAR}</strong></td>
+                        <td class="val">{formatMoney(globalRecord.cost_total_mes)}</td>
+                        <td class={globalRecord.cost_01_05 ? 'val' : 'zero'}>{formatMoney(globalRecord.cost_01_05)}</td>
+                        <td class={globalRecord.cost_06_10 ? 'val' : 'zero'}>{formatMoney(globalRecord.cost_06_10)}</td>
+                        <td class={globalRecord.cost_11_15 ? 'val' : 'zero'}>{formatMoney(globalRecord.cost_11_15)}</td>
+                        <td class={globalRecord.cost_16_20 ? 'val' : 'zero'}>{formatMoney(globalRecord.cost_16_20)}</td>
+                        <td class={globalRecord.cost_21_25 ? 'val' : 'zero'}>{formatMoney(globalRecord.cost_21_25)}</td>
+                        <td class={globalRecord.cost_26_31 ? 'val' : 'zero'}>{formatMoney(globalRecord.cost_26_31)}</td>
+                        <td class={globalRecord.leads_total_mes > 0 ? 'val' : (globalRecord.cost_total_mes > 0 ? 'warn-cell' : 'zero')}>
+                            {globalRecord.leads_total_mes}
+                        </td>
+                        <td class="val">{formatCpl(globalRecord.cost_total_mes, globalRecord.leads_total_mes)}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Cross-validation: GLOBAL vs sum of individual brands -->
+            <h3>Cross-Validation: GLOBAL vs Sum of Individual Brands</h3>
+            <table class="diag-table">
+                <tr>
+                    <td>GLOBAL cost_total_mes</td>
+                    <td class="val">{formatMoney(globalRecord.cost_total_mes)}</td>
+                </tr>
+                <tr>
+                    <td>Sum of brand cost_total_mes ({marcasSinGlobal.length} marcas)</td>
+                    <td class="val">{formatMoney(computedTotalSpend)}</td>
+                </tr>
+                <tr>
+                    <td>Diferencia</td>
+                    <td class={Math.abs(globalRecord.cost_total_mes - computedTotalSpend) < 1 ? 'match' : 'mismatch'}>
+                        {formatMoney(Math.abs(globalRecord.cost_total_mes - computedTotalSpend))}
+                        {Math.abs(globalRecord.cost_total_mes - computedTotalSpend) < 1 ? ' ✓ MATCH' : ' ✗ MISMATCH'}
+                    </td>
+                </tr>
+                <tr>
+                    <td>GLOBAL leads_total_mes</td>
+                    <td class="val">{globalRecord.leads_total_mes}</td>
+                </tr>
+                <tr>
+                    <td>Sum of brand leads_total_mes</td>
+                    <td class="val">{computedTotalLeads}</td>
+                </tr>
+                <tr>
+                    <td>Diferencia Leads</td>
+                    <td class={Math.abs(globalRecord.leads_total_mes - computedTotalLeads) < 1 ? 'match' : 'mismatch'}>
+                        {Math.abs(globalRecord.leads_total_mes - computedTotalLeads)}
+                        {Math.abs(globalRecord.leads_total_mes - computedTotalLeads) < 1 ? ' ✓ MATCH' : ' ✗ MISMATCH'}
+                    </td>
+                </tr>
+            </table>
+        </Fragment>
+    ) : (
+        <div class="warn-box">
+            <strong>NO GLOBAL RECORD FOUND:</strong> No existe un registro con brand = "GLOBAL" para este periodo.<br/>
+            Esto puede significar que el pipeline n8n no genera una fila GLOBAL consolidada. El dashboard calcula el total sumando las marcas individuales.<br/>
+            <br/>
+            <strong>Computed totals from {marcasSinGlobal.length} brands:</strong><br/>
+            Total Spend: {formatMoney(computedTotalSpend)} | Total Leads: {computedTotalLeads} | CPL: {formatCpl(computedTotalSpend, computedTotalLeads)}
+        </div>
+    )}
+
+    <!-- ==================== SECTION 6: ACCOUNTS CONSOLIDATED (Level 3) ==================== -->
+    <h2 id="s6">6. ACCOUNTS CONSOLIDATED (Level 3) - tipo_registro = "Cuenta"</h2>
+    <p style="color: #888;">Validacion de gastos a nivel de cuenta individual. Verifica que coincida con los montos de facturacion.</p>
+
+    {cuentas.length === 0 ? (
+        <div class="warn-box">
+            <strong>NO ACCOUNT RECORDS:</strong> No se encontraron registros con tipo_registro = "Cuenta" para este periodo.<br/>
+            El pipeline puede no generar filas a nivel de cuenta. Los datos de marca se usan como nivel consolidado mas bajo.
+        </div>
+    ) : (
+        <Fragment>
+            <table class="data">
+                <thead>
+                    <tr>
+                        <th>Account Name</th>
+                        <th>Brand</th>
+                        <th>Total Spend</th>
+                        <th>Cost 1-5</th>
+                        <th>Cost 6-10</th>
+                        <th>Cost 11-15</th>
+                        <th>Cost 16-20</th>
+                        <th>Cost 21-25</th>
+                        <th>Cost 26-31</th>
+                        <th>Leads</th>
+                        <th>CPL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {cuentas.map((r: any) => (
+                        <tr>
+                            <td class="text"><strong>{r.nombre_cuenta || r.campaign_name || '—'}</strong></td>
+                            <td class="text">{r.brand}</td>
+                            <td class="val">{formatMoney(r.cost_total_mes)}</td>
+                            <td class={r.cost_01_05 ? 'val' : 'zero'}>{formatMoney(r.cost_01_05)}</td>
+                            <td class={r.cost_06_10 ? 'val' : 'zero'}>{formatMoney(r.cost_06_10)}</td>
+                            <td class={r.cost_11_15 ? 'val' : 'zero'}>{formatMoney(r.cost_11_15)}</td>
+                            <td class={r.cost_16_20 ? 'val' : 'zero'}>{formatMoney(r.cost_16_20)}</td>
+                            <td class={r.cost_21_25 ? 'val' : 'zero'}>{formatMoney(r.cost_21_25)}</td>
+                            <td class={r.cost_26_31 ? 'val' : 'zero'}>{formatMoney(r.cost_26_31)}</td>
+                            <td class={r.leads_total_mes > 0 ? 'val' : (r.cost_total_mes > 0 ? 'warn-cell' : 'zero')}>
+                                {r.leads_total_mes}
+                            </td>
+                            <td class="val">{formatCpl(r.cost_total_mes, r.leads_total_mes)}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+            <p style="color: #666;">Total cuentas: {cuentas.length} | Gasto agregado: {formatMoney(cuentas.reduce((s: number, r: any) => s + (r.cost_total_mes || 0), 0))}</p>
+        </Fragment>
+    )}
+
+    <!-- ==================== SECTION 7: BRAND CONSOLIDATED (Level 2) ==================== -->
+    <h2 id="s7">7. BRAND CONSOLIDATED (Level 2) - tipo_registro = "Marca" &amp;&amp; brand != "GLOBAL"</h2>
+    <p style="color: #888;">Verifica que las columnas de 5 dias rendericen valores del backend. Si muestran 0 con el nuevo TransformData de n8n activo, hay un problema en el pipeline.</p>
+
+    {marcasSinGlobal.length === 0 ? (
+        <p class="fail">No se encontraron registros de marca (sin GLOBAL) para este periodo.</p>
+    ) : (
+        <Fragment>
+            <table class="data">
+                <thead>
+                    <tr>
+                        <th>Brand</th>
+                        <th>Total Spend</th>
+                        <th>Cost 1-5</th>
+                        <th>Cost 6-10</th>
+                        <th>Cost 11-15</th>
+                        <th>Cost 16-20</th>
+                        <th>Cost 21-25</th>
+                        <th>Cost 26-31</th>
+                        <th>Leads</th>
+                        <th>L. 1-5</th>
+                        <th>L. 6-10</th>
+                        <th>L. 11-15</th>
+                        <th>L. 16-20</th>
+                        <th>L. 21-25</th>
+                        <th>L. 26-31</th>
+                        <th>CPL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {marcasSinGlobal.map((r: any) => {
+                        const cpl = formatCplRaw(r.cost_total_mes, r.leads_total_mes);
+                        const hasSpendNoLeads = r.cost_total_mes > 0 && r.leads_total_mes === 0;
+                        const allCostZero = !r.cost_01_05 && !r.cost_06_10 && !r.cost_11_15 && !r.cost_16_20 && !r.cost_21_25 && !r.cost_26_31;
+                        return (
+                            <tr>
+                                <td class="text">
+                                    <strong>{r.brand}</strong>
+                                    {allCostZero && r.cost_total_mes > 0 && <span style="color: #f44;" title="5-day columns are all 0 but total > 0"> !</span>}
+                                </td>
+                                <td class="val">{formatMoney(r.cost_total_mes)}</td>
+                                <td class={r.cost_01_05 ? 'val' : 'zero'}>{formatMoney(r.cost_01_05)}</td>
+                                <td class={r.cost_06_10 ? 'val' : 'zero'}>{formatMoney(r.cost_06_10)}</td>
+                                <td class={r.cost_11_15 ? 'val' : 'zero'}>{formatMoney(r.cost_11_15)}</td>
+                                <td class={r.cost_16_20 ? 'val' : 'zero'}>{formatMoney(r.cost_16_20)}</td>
+                                <td class={r.cost_21_25 ? 'val' : 'zero'}>{formatMoney(r.cost_21_25)}</td>
+                                <td class={r.cost_26_31 ? 'val' : 'zero'}>{formatMoney(r.cost_26_31)}</td>
+                                <td class={hasSpendNoLeads ? 'warn-cell' : (r.leads_total_mes > 0 ? 'val' : 'zero')}>
+                                    {r.leads_total_mes}
+                                </td>
+                                <td class={r.leads_01_05 ? 'val' : 'zero'}>{r.leads_01_05 || 0}</td>
+                                <td class={r.leads_06_10 ? 'val' : 'zero'}>{r.leads_06_10 || 0}</td>
+                                <td class={r.leads_11_15 ? 'val' : 'zero'}>{r.leads_11_15 || 0}</td>
+                                <td class={r.leads_16_20 ? 'val' : 'zero'}>{r.leads_16_20 || 0}</td>
+                                <td class={r.leads_21_25 ? 'val' : 'zero'}>{r.leads_21_25 || 0}</td>
+                                <td class={r.leads_26_31 ? 'val' : 'zero'}>{r.leads_26_31 || 0}</td>
+                                <td class={cpl !== null && cpl > 1200 ? 'fail' : (cpl !== null && cpl > 800 ? 'warn' : 'val')}>
+                                    {cpl !== null ? formatMoney(cpl) : 'N/A'}
+                                </td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+            </table>
+
+            <!-- 5-day column health check -->
+            {(() => {
+                const brandsWithZeroCols = marcasSinGlobal.filter((r: any) =>
+                    r.cost_total_mes > 0 && !r.cost_01_05 && !r.cost_06_10 && !r.cost_11_15 && !r.cost_16_20 && !r.cost_21_25 && !r.cost_26_31
+                );
+                const brandsWithData = marcasSinGlobal.filter((r: any) =>
+                    r.cost_01_05 || r.cost_06_10 || r.cost_11_15 || r.cost_16_20 || r.cost_21_25 || r.cost_26_31
+                );
+                return brandsWithZeroCols.length > 0 ? (
+                    <div class="warn-box">
+                        <strong>5-DAY COLUMN WARNING:</strong> {brandsWithZeroCols.length} marca(s) tienen cost_total_mes &gt; 0 pero TODAS las columnas de 5 dias en 0.<br/>
+                        Marcas afectadas: {brandsWithZeroCols.map((r: any) => r.brand).join(', ')}<br/>
+                        Esto indica que el TransformData de n8n NO esta distribuyendo los costos en periodos de 5 dias.
+                    </div>
+                ) : brandsWithData.length > 0 ? (
+                    <div class="info">
+                        <strong>5-DAY COLUMNS OK:</strong> {brandsWithData.length}/{marcasSinGlobal.length} marcas tienen datos en columnas de periodos de 5 dias.
+                    </div>
+                ) : null;
+            })()}
+        </Fragment>
+    )}
+
+    <!-- ==================== SECTION 8: FORMULA CALCULATIONS & LOGIC ==================== -->
+    <h2 id="s8">8. FORMULA CALCULATIONS &amp; LOGIC</h2>
+    <p style="color: #888;">Tabla logica que muestra como la UI computa cada metrica del dashboard.</p>
+
+    <table class="logic">
+        <thead>
+            <tr>
+                <th>Metric</th>
+                <th>Formula</th>
+                <th>Current Value</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="metric">Total Spend (Global)</td>
+                <td class="formula">SUM(marcas.cost_total_mes) where brand != "GLOBAL"</td>
+                <td class="result">{formatMoney(computedTotalSpend)}</td>
+                <td style="color: #888;">Sumado de {marcasSinGlobal.length} marcas individuales</td>
+            </tr>
+            <tr>
+                <td class="metric">Total Leads (Global)</td>
+                <td class="formula">SUM(marcas.leads_total_mes) where brand != "GLOBAL"</td>
+                <td class="result">{computedTotalLeads}</td>
+                <td style="color: #888;">Sumado de {marcasSinGlobal.length} marcas individuales</td>
+            </tr>
+            <tr>
+                <td class="metric">CPL (Cost Per Lead)</td>
+                <td class="formula">cost_total_mes / leads_total_mes</td>
+                <td class="result">{formatCpl(computedTotalSpend, computedTotalLeads)}</td>
+                <td style="color: #888;">Muestra "N/A" si leads = 0</td>
+            </tr>
+            <tr>
+                <td class="metric">Avg CPL (Global)</td>
+                <td class="formula">totalSpend / totalLeads</td>
+                <td class="result">{formatCpl(computedTotalSpend, computedTotalLeads)}</td>
+                <td style="color: #888;">Promedio ponderado, no promedio de CPLs</td>
+            </tr>
+            <tr>
+                <td class="metric">ROAS (Estimated)</td>
+                <td class="formula">(Total Leads * Avg Lead Value) / Total Cost</td>
+                <td class="result" style="color: #666;">No conversion_value disponible</td>
+                <td style="color: #888;">Requiere campo conversion_value o valor fijo por lead</td>
+            </tr>
+            <tr>
+                <td class="metric">CPL Color Thresholds</td>
+                <td class="formula">
+                    Green: CPL &lt; $800<br/>
+                    Yellow: $800 &le; CPL &lt; $1,200<br/>
+                    Red: CPL &ge; $1,200<br/>
+                    Gray: CPL = 0 (no leads)
+                </td>
+                <td class="result">—</td>
+                <td style="color: #888;">Definido en lib/format.ts getCplColor()</td>
+            </tr>
+            <tr>
+                <td class="metric">Trend Indicator</td>
+                <td class="formula">((currentCPL - targetCPL) / targetCPL) * 100</td>
+                <td class="result" style="color: #666;">Target no configurado</td>
+                <td style="color: #888;">Ej: "↓ 8.2% vs target" - requiere campo target_cpl</td>
+            </tr>
+            <tr>
+                <td class="metric">5-Day Period CPL</td>
+                <td class="formula">cost_XX_YY / leads_XX_YY per period</td>
+                <td class="result">—</td>
+                <td style="color: #888;">Calculado per-period en BrandMonthView.astro</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Per-brand CPL breakdown -->
+    <h3>Per-Brand CPL Breakdown</h3>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>Brand</th>
+                <th>Spend</th>
+                <th>Leads</th>
+                <th>CPL</th>
+                <th>CPL Color</th>
+                <th>% del Gasto Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {marcasSinGlobal
+                .sort((a: any, b: any) => (b.cost_total_mes || 0) - (a.cost_total_mes || 0))
+                .map((r: any) => {
+                    const cpl = formatCplRaw(r.cost_total_mes, r.leads_total_mes);
+                    const pct = computedTotalSpend > 0 ? ((r.cost_total_mes || 0) / computedTotalSpend * 100).toFixed(1) : '0';
+                    return (
+                        <tr>
+                            <td class="text"><strong>{r.brand}</strong></td>
+                            <td class="val">{formatMoney(r.cost_total_mes)}</td>
+                            <td class={r.leads_total_mes > 0 ? 'val' : (r.cost_total_mes > 0 ? 'warn-cell' : 'zero')}>
+                                {r.leads_total_mes}
+                            </td>
+                            <td class={cpl !== null && cpl > 1200 ? 'fail' : (cpl !== null && cpl > 800 ? 'warn' : 'val')}>
+                                {cpl !== null ? formatMoney(cpl) : 'N/A'}
+                            </td>
+                            <td style={`color: ${cpl === null || cpl === 0 ? '#555' : cpl < 800 ? '#0f0' : cpl < 1200 ? '#ff0' : '#f44'}`}>
+                                {cpl === null ? 'GRAY (N/A)' : cpl === 0 ? 'GRAY' : cpl < 800 ? 'GREEN' : cpl < 1200 ? 'YELLOW' : 'RED'}
+                            </td>
+                            <td class="val">{pct}%</td>
+                        </tr>
+                    );
+                })
+            }
+        </tbody>
+    </table>
+
+    <!-- ==================== SECTION 9: MULTI-LAYER RAW JSON SAMPLES ==================== -->
+    <h2 id="s9">9. MULTI-LAYER RAW JSON SAMPLES</h2>
+    <p style="color: #888;">Muestras de JSON crudo por capa. Confirma la estructura de unique_key (ej: MARCA|DEX|2|2026) en todos los niveles.</p>
+
+    <div class="tab-container">
+        <div class="tab-buttons">
+            <button class="tab-btn active" data-tab="tab-global">GLOBAL SAMPLE</button>
+            <button class="tab-btn" data-tab="tab-cuenta">CUENTA SAMPLE</button>
+            <button class="tab-btn" data-tab="tab-marca">MARCA SAMPLE</button>
+            <button class="tab-btn" data-tab="tab-campana">CAMPANA SAMPLE</button>
+        </div>
+
+        <div id="tab-global" class="tab-content active">
+            <div class="debug-json">
+                <pre>{JSON.stringify(globalRecord || "No se encontro registro GLOBAL (brand='GLOBAL')", null, 4)}</pre>
+            </div>
+        </div>
+
+        <div id="tab-cuenta" class="tab-content">
+            <div class="debug-json">
+                <pre>{JSON.stringify(cuentas.length > 0 ? cuentas[0] : "No se encontraron registros de tipo Cuenta", null, 4)}</pre>
+            </div>
+            {cuentas.length > 1 && (
+                <p style="color: #666; margin-top: 8px;">Mostrando 1 de {cuentas.length} registros de cuenta.</p>
+            )}
+        </div>
+
+        <div id="tab-marca" class="tab-content">
+            <div class="debug-json">
+                <pre>{JSON.stringify(marcasSinGlobal.length > 0 ? marcasSinGlobal[0] : "No se encontraron registros de marca (sin GLOBAL)", null, 4)}</pre>
+            </div>
+            {marcasSinGlobal.length > 1 && (
+                <p style="color: #666; margin-top: 8px;">Mostrando 1 de {marcasSinGlobal.length} registros de marca.</p>
+            )}
+        </div>
+
+        <div id="tab-campana" class="tab-content">
+            <div class="debug-json">
+                <pre>{JSON.stringify(campanas.length > 0 ? campanas[0] : "No se encontraron registros de campana", null, 4)}</pre>
+            </div>
+            {campanas.length > 1 && (
+                <p style="color: #666; margin-top: 8px;">Mostrando 1 de {campanas.length} registros de campana.</p>
+            )}
+        </div>
+    </div>
+
+    <!-- ==================== SECTION 10: SYSTEM INTEGRITY CHECK ==================== -->
+    <h2 id="s10">10. SYSTEM INTEGRITY CHECK</h2>
+    <p style="color: #888;">Verificacion de integridad del sistema: latencia, conteo de registros, y validacion de esquema.</p>
+
+    <table class="integrity">
+        <thead>
+            <tr>
+                <th>Check</th>
+                <th>Value</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="label">Database Query Latency</td>
+                <td class="value">{dbQueryEnd - dbQueryStart}ms (full list query)</td>
+                <td class={(dbQueryEnd - dbQueryStart) < 1000 ? 'ok' : (dbQueryEnd - dbQueryStart) < 3000 ? 'warn' : 'fail'}>
+                    {(dbQueryEnd - dbQueryStart) < 1000 ? 'GOOD' : (dbQueryEnd - dbQueryStart) < 3000 ? 'SLOW' : 'CRITICAL'}
+                </td>
+            </tr>
+            <tr>
+                <td class="label">Last Updated Timestamp</td>
+                <td class="value">{latestUpdated || 'N/A'}</td>
+                <td class={timeSinceUpdate !== null ? (timeSinceUpdate < 60 ? 'ok' : timeSinceUpdate < 1440 ? 'warn' : 'fail') : 'fail'}>
+                    {timeSinceUpdate !== null ? (
+                        timeSinceUpdate < 60 ? `${timeSinceUpdate} min ago - FRESH` :
+                        timeSinceUpdate < 1440 ? `${Math.round(timeSinceUpdate / 60)}h ago - AGING` :
+                        `${Math.round(timeSinceUpdate / 1440)}d ago - STALE`
+                    ) : 'NO DATA'}
+                </td>
+            </tr>
+            <tr>
+                <td class="label">Total Records (this period)</td>
+                <td class="value">{allRecords.length}</td>
+                <td class={allRecords.length > 0 ? 'ok' : 'fail'}>
+                    {allRecords.length > 0 ? 'OK' : 'EMPTY'}
+                </td>
+            </tr>
+            <tr>
+                <td class="label">Record Type Breakdown</td>
+                <td class="value" set:html={
+                    Array.from(tipoRegistroSet).map(t => {
+                        const count = allRecords.filter((r: any) => r.tipo_registro === t).length;
+                        return `${t}: ${count}`;
+                    }).join(' | ')
+                } />
+                <td class={tipoRegistroSet.size > 0 ? 'ok' : 'fail'}>
+                    {tipoRegistroSet.size} tipo(s)
+                </td>
+            </tr>
+            <tr>
+                <td class="label">Marca Records (non-GLOBAL)</td>
+                <td class="value">{marcasSinGlobal.length} brands</td>
+                <td class={marcasSinGlobal.length > 0 ? 'ok' : 'fail'}>
+                    {marcasSinGlobal.length > 0 ? 'OK' : 'NONE'}
+                </td>
+            </tr>
+            <tr>
+                <td class="label">Campaign Records</td>
+                <td class="value">{campanas.length} campaigns</td>
+                <td class={campanas.length > 0 ? 'ok' : 'warn'}>
+                    {campanas.length > 0 ? 'OK' : 'NONE'}
+                </td>
+            </tr>
+            <tr>
+                <td class="label">Account Records</td>
+                <td class="value">{cuentas.length} accounts</td>
+                <td class={cuentas.length > 0 ? 'ok' : 'warn'}>
+                    {cuentas.length > 0 ? 'OK' : 'NOT PRESENT'}
+                </td>
+            </tr>
+            <tr>
+                <td class="label">GLOBAL Record</td>
+                <td class="value">{globalRecord ? 'Present' : 'Not found'}</td>
+                <td class={globalRecord ? 'ok' : 'warn'}>
+                    {globalRecord ? 'OK' : 'OPTIONAL'}
+                </td>
+            </tr>
+            <tr>
+                <td class="label">Page Total Render Time</td>
+                <td class="value">{pageLoadEnd - pageLoadStart}ms</td>
+                <td class={(pageLoadEnd - pageLoadStart) < 2000 ? 'ok' : (pageLoadEnd - pageLoadStart) < 5000 ? 'warn' : 'fail'}>
+                    {(pageLoadEnd - pageLoadStart) < 2000 ? 'FAST' : (pageLoadEnd - pageLoadStart) < 5000 ? 'MODERATE' : 'SLOW'}
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Schema Validation -->
+    <h3>Schema Field Validation</h3>
+    <table class="integrity">
+        <thead>
+            <tr>
+                <th>Field</th>
+                <th>Sample Value</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {sampleRecord ? (
+                <Fragment>
+                    {/* Core fields */}
+                    {['brand', 'tipo_registro', 'year', 'month_num', 'mes', 'cost_total_mes', 'leads_total_mes', 'nombre_cuenta', 'campaign_name', 'campaign_id'].map(field => (
+                        <tr>
+                            <td class="label">{field}</td>
+                            <td class="value">{String(sampleRecord[field] ?? 'undefined').substring(0, 80)}</td>
+                            <td class={sampleRecord[field] !== undefined && sampleRecord[field] !== null ? 'ok' : 'warn'}>
+                                {sampleRecord[field] !== undefined && sampleRecord[field] !== null ? 'PRESENT' : 'MISSING'}
+                            </td>
+                        </tr>
+                    ))}
+                    {/* 5-day cost fields */}
+                    {costPeriodFields.map((field, i) => (
+                        <tr>
+                            <td class="label">{field}</td>
+                            <td class="value">{sampleRecord[field] ?? 'undefined'}</td>
+                            <td class={sampleRecord[field] !== undefined ? 'ok' : 'fail'}>
+                                {sampleRecord[field] !== undefined ? 'PRESENT' : 'MISSING SCHEMA'}
+                            </td>
+                        </tr>
+                    ))}
+                    {/* 5-day lead fields */}
+                    {leadPeriodFields.map((field, i) => (
+                        <tr>
+                            <td class="label">{field}</td>
+                            <td class="value">{sampleRecord[field] ?? 'undefined'}</td>
+                            <td class={sampleRecord[field] !== undefined ? 'ok' : 'fail'}>
+                                {sampleRecord[field] !== undefined ? 'PRESENT' : 'MISSING SCHEMA'}
+                            </td>
+                        </tr>
+                    ))}
+                    {/* Semana string fields (dynamic labels) */}
+                    {semanaFields.map(field => (
+                        <tr>
+                            <td class="label">{field}</td>
+                            <td class="value">{sampleRecord[field] ? String(sampleRecord[field]) : 'NOT FOUND'}</td>
+                            <td class={sampleRecord[field] ? 'ok' : 'warn'}>
+                                {sampleRecord[field] ? `DYNAMIC: "${sampleRecord[field]}"` : 'NOT IN SCHEMA'}
+                            </td>
+                        </tr>
+                    ))}
+                </Fragment>
+            ) : (
+                <tr>
+                    <td class="label" colspan="3" style="text-align: center;">No records available for schema validation</td>
+                </tr>
+            )}
+        </tbody>
+    </table>
+
+    <!-- High CPL Warning Summary -->
+    <h3>High CPL Warnings (Spend &gt; 0, Leads = 0)</h3>
+    {(() => {
+        const highCplRecords = [...marcasSinGlobal, ...campanas].filter((r: any) => r.cost_total_mes > 0 && r.leads_total_mes === 0);
+        return highCplRecords.length > 0 ? (
+            <Fragment>
+                <div class="warn-box">
+                    <strong>{highCplRecords.length} registro(s)</strong> tienen gasto &gt; 0 pero 0 leads (CPL infinito).
+                </div>
+                <table class="data">
+                    <thead>
+                        <tr>
+                            <th>Tipo</th>
+                            <th>Brand</th>
+                            <th>Campaign</th>
+                            <th>Spend</th>
+                            <th>Leads</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {highCplRecords.map((r: any) => (
+                            <tr>
+                                <td class="text">{r.tipo_registro}</td>
+                                <td class="text">{r.brand}</td>
+                                <td class="text" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                    {r.campaign_name || '—'}
+                                </td>
+                                <td class="val">{formatMoney(r.cost_total_mes)}</td>
+                                <td class="warn-cell">0</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </Fragment>
+        ) : (
+            <div class="info">
+                <strong>ALL CLEAR:</strong> No hay registros con gasto &gt; 0 y 0 leads.
+            </div>
+        );
+    })()}
+
+    <p style="color: #333; margin-top: 40px; text-align: center;">--- END DEBUG MODE ---</p>
+
+    <!-- Tab switching JavaScript -->
+    <script>
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabId = btn.getAttribute('data-tab');
+                if (!tabId) return;
+
+                // Deactivate all tabs and content
+                btn.closest('.tab-container')?.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.closest('.tab-container')?.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+                // Activate clicked tab and its content
+                btn.classList.add('active');
+                document.getElementById(tabId)?.classList.add('active');
+            });
+        });
+    </script>
 
 </body>
 </html>
