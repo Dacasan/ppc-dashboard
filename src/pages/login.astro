@@ -67,24 +67,66 @@ try {
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <title>Iniciar sesión | A1 Marketing</title>
 </head>
-<body class="min-h-screen bg-zinc-50 flex items-center justify-center p-4">
+<body class="min-h-screen flex bg-white">
 
-  <div class="w-full max-w-sm">
+  <!-- Left panel: branding + dashboard preview (desktop only) -->
+  <div class="hidden lg:flex lg:w-3/5 relative overflow-hidden flex-col">
+    <!-- Dashboard background image -->
+    <img
+      src="/dashboard.jpg"
+      alt="Vista previa del dashboard"
+      class="absolute inset-0 w-full h-full object-cover object-top"
+    />
+    <!-- Gradient overlay -->
+    <div class="absolute inset-0 bg-gradient-to-br from-blue-950/90 via-blue-900/80 to-blue-700/70"></div>
 
-    <!-- Logo / Brand -->
-    <div class="text-center mb-8">
-      <div class="inline-flex items-center gap-3 mb-3">
-        <span class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white text-sm font-black shadow-lg">A1</span>
-        <span class="text-2xl font-black text-zinc-900 tracking-tight">Marketing</span>
+    <!-- Panel content -->
+    <div class="relative z-10 flex flex-col justify-between h-full p-12">
+      <!-- Brand -->
+      <div class="flex items-center gap-3">
+        <img src="/logoa1.jpg" alt="A1 Marketing" class="w-11 h-11 rounded-xl object-cover shadow-lg" />
+        <span class="text-2xl font-black text-white tracking-tight">A1 Marketing</span>
       </div>
-      <p class="text-zinc-500 text-sm">Panel de control de campañas PPC</p>
+
+      <!-- Headline -->
+      <div>
+        <h2 class="text-5xl font-black text-white leading-tight mb-5">
+          Panel de Control<br />de Campañas PPC
+        </h2>
+        <p class="text-blue-200 text-lg max-w-md leading-relaxed">
+          Visualiza el rendimiento de tus campañas de Google Ads con datos en tiempo real y reportes automáticos.
+        </p>
+
+        <!-- Feature tags -->
+        <div class="flex flex-wrap items-center gap-3 mt-8">
+          {['Análisis en tiempo real', 'Multi-marca', 'Reportes automáticos', 'Google Ads'].map((tag) => (
+            <span class="px-3 py-1.5 rounded-full bg-white/10 border border-white/20 text-white/80 text-xs font-medium backdrop-blur-sm">
+              {tag}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <!-- Footer note -->
+      <p class="text-blue-300/60 text-xs">
+        &copy; {new Date().getFullYear()} A1 Marketing. Todos los derechos reservados.
+      </p>
     </div>
+  </div>
 
-    <!-- Login Card -->
-    <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm p-8">
+  <!-- Right panel: login form -->
+  <div class="w-full lg:w-2/5 flex items-center justify-center p-8 bg-white">
+    <div class="w-full max-w-sm">
 
-      <h1 class="text-xl font-bold text-zinc-900 mb-1">Iniciar sesión</h1>
-      <p class="text-zinc-400 text-sm mb-6">Accede con tu cuenta de Google corporativa</p>
+      <!-- Logo (visible on all screens) -->
+      <div class="flex items-center gap-3 mb-10">
+        <img src="/logoa1.jpg" alt="A1 Marketing" class="w-10 h-10 rounded-xl object-cover shadow-sm" />
+        <span class="text-xl font-black text-zinc-900 tracking-tight">A1 Marketing</span>
+      </div>
+
+      <!-- Heading -->
+      <h1 class="text-2xl font-black text-zinc-900 mb-1.5">Bienvenido de vuelta</h1>
+      <p class="text-zinc-500 text-sm mb-8">Accede con tu cuenta de Google corporativa</p>
 
       <!-- Error message -->
       {errorMsg && (
@@ -106,7 +148,7 @@ try {
       {googleAuthUrl ? (
         <a
           href={googleAuthUrl}
-          class="flex items-center justify-center gap-3 w-full px-4 py-3 bg-white border-2 border-zinc-200 rounded-xl text-sm font-semibold text-zinc-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 group shadow-sm"
+          class="flex items-center justify-center gap-3 w-full px-4 py-3.5 bg-white border-2 border-zinc-200 rounded-xl text-sm font-semibold text-zinc-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 group shadow-sm"
         >
           <!-- Google SVG icon -->
           <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24">
@@ -121,22 +163,22 @@ try {
       ) : (
         <button
           disabled
-          class="flex items-center justify-center gap-3 w-full px-4 py-3 bg-zinc-100 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-400 cursor-not-allowed"
+          class="flex items-center justify-center gap-3 w-full px-4 py-3.5 bg-zinc-100 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-400 cursor-not-allowed"
         >
           <i class="fa-brands fa-google"></i>
           <span>Google no disponible</span>
         </button>
       )}
 
-      <p class="mt-5 text-center text-xs text-zinc-400">
+      <p class="mt-6 text-center text-xs text-zinc-400">
         Solo usuarios autorizados pueden acceder a este panel.
       </p>
-    </div>
 
-    <!-- Footer -->
-    <p class="text-center text-xs text-zinc-400 mt-6">
-      &copy; {new Date().getFullYear()} A1 Marketing. Todos los derechos reservados.
-    </p>
+      <!-- Mobile footer -->
+      <p class="lg:hidden text-center text-xs text-zinc-400 mt-12">
+        &copy; {new Date().getFullYear()} A1 Marketing. Todos los derechos reservados.
+      </p>
+    </div>
   </div>
 
 </body>
