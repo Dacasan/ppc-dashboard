@@ -32,7 +32,7 @@ const brandDataMap = new Map(
 
       return (
         <div class="snap-start shrink-0 w-[170px] p-3 rounded-xl border border-zinc-200 bg-white hover:border-zinc-300 hover:shadow-sm transition-all">
-          <a href={`/dashboard/${brand.slug}`} class="block mb-2">
+          <a href={`/${brand.slug}`} class="block mb-2">
             <div class="flex items-center gap-2 mb-2">
               <span class="w-7 h-7 rounded-lg bg-zinc-100 flex items-center justify-center text-sm">🦷</span>
               <span class="font-semibold text-xs text-zinc-800 truncate">{brand.name}</span>
@@ -43,8 +43,8 @@ const brandDataMap = new Map(
             </div>
           </a>
           <div class="flex rounded-md border border-zinc-200 overflow-hidden text-[10px]">
-            <a href={`/dashboard/${brand.slug}`} class="flex-1 text-center py-0.5 bg-zinc-900 text-white font-medium">Mes</a>
-            <a href={`/dashboard/${brand.slug}/year`} class="flex-1 text-center py-0.5 bg-white text-zinc-500 font-medium hover:bg-zinc-50">Año</a>
+            <a href={`/${brand.slug}`} class="flex-1 text-center py-0.5 bg-zinc-900 text-white font-medium">Mes</a>
+            <a href={`/${brand.slug}/year`} class="flex-1 text-center py-0.5 bg-white text-zinc-500 font-medium hover:bg-zinc-50">Año</a>
           </div>
         </div>
       );

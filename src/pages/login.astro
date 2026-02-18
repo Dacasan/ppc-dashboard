@@ -1,0 +1,143 @@
+---
+import PocketBase from 'pocketbase';
+import '../styles/global.css';
+
+// If already logged in, go to home
+const pbAuth = Astro.cookies.get('pb_auth');
+if (pbAuth?.value) {
+  return Astro.redirect('/');
+}
+
+const errorParam = Astro.url.searchParams.get('error');
+const errorMessages: Record<string, string> = {
+  session_expired: 'Tu sesión expiró. Vuelve a iniciar sesión.',
+  auth_failed: 'Error de autenticación. Intenta de nuevo.',
+  invalid_state: 'Error de seguridad. Intenta de nuevo.',
+  missing_params: 'Error en el proceso de login. Intenta de nuevo.',
+};
+const errorMsg = errorParam ? (errorMessages[errorParam] ?? 'Error desconocido.') : null;
+
+// Generate Google OAuth2 URL from PocketBase
+const pbUrl = 'https://a1-pocketbase.adwebcrm.com';
+const pb = new PocketBase(pbUrl);
+pb.autoCancellation(false);
+
+let googleAuthUrl = '';
+let setupError = '';
+
+try {
+  const authMethods = await pb.collection('users').listAuthMethods();
+  const googleProvider = authMethods.oauth2?.providers?.find((p: any) => p.name === 'google');
+
+  if (googleProvider) {
+    const redirectUrl = `${Astro.url.origin}/auth/callback`;
+    // PocketBase authUrl already includes state + PKCE challenge; append redirect_uri
+    googleAuthUrl = `${googleProvider.authUrl}${encodeURIComponent(redirectUrl)}`;
+
+    // Store codeVerifier and state so the callback can verify and exchange
+    Astro.cookies.set('oauth_code_verifier', googleProvider.codeVerifier, {
+      httpOnly: true,
+      secure: Astro.url.protocol === 'https:',
+      sameSite: 'lax',
+      maxAge: 600, // 10 min
+      path: '/',
+    });
+    Astro.cookies.set('oauth_state', googleProvider.state, {
+      httpOnly: true,
+      secure: Astro.url.protocol === 'https:',
+      sameSite: 'lax',
+      maxAge: 600,
+      path: '/',
+    });
+  } else {
+    setupError = 'Google Auth no está habilitado en PocketBase.';
+  }
+} catch (e) {
+  console.error('[Login] Error getting auth methods:', e);
+  setupError = 'No se pudo conectar con el servidor de autenticación.';
+}
+---
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <title>Iniciar sesión | A1 Marketing</title>
+</head>
+<body class="min-h-screen bg-zinc-50 flex items-center justify-center p-4">
+
+  <div class="w-full max-w-sm">
+
+    <!-- Logo / Brand -->
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center gap-3 mb-3">
+        <span class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white text-sm font-black shadow-lg">A1</span>
+        <span class="text-2xl font-black text-zinc-900 tracking-tight">Marketing</span>
+      </div>
+      <p class="text-zinc-500 text-sm">Panel de control de campañas PPC</p>
+    </div>
+
+    <!-- Login Card -->
+    <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm p-8">
+
+      <h1 class="text-xl font-bold text-zinc-900 mb-1">Iniciar sesión</h1>
+      <p class="text-zinc-400 text-sm mb-6">Accede con tu cuenta de Google corporativa</p>
+
+      <!-- Error message -->
+      {errorMsg && (
+        <div class="mb-5 flex items-start gap-2.5 px-4 py-3 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-700">
+          <i class="fa-solid fa-circle-exclamation mt-0.5 shrink-0"></i>
+          <span>{errorMsg}</span>
+        </div>
+      )}
+
+      <!-- Setup error -->
+      {setupError && (
+        <div class="mb-5 flex items-start gap-2.5 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">
+          <i class="fa-solid fa-triangle-exclamation mt-0.5 shrink-0"></i>
+          <span>{setupError}</span>
+        </div>
+      )}
+
+      <!-- Google OAuth Button -->
+      {googleAuthUrl ? (
+        <a
+          href={googleAuthUrl}
+          class="flex items-center justify-center gap-3 w-full px-4 py-3 bg-white border-2 border-zinc-200 rounded-xl text-sm font-semibold text-zinc-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 group shadow-sm"
+        >
+          <!-- Google SVG icon -->
+          <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+          </svg>
+          <span>Continuar con Google</span>
+          <i class="fa-solid fa-arrow-right text-xs opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all duration-200"></i>
+        </a>
+      ) : (
+        <button
+          disabled
+          class="flex items-center justify-center gap-3 w-full px-4 py-3 bg-zinc-100 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-400 cursor-not-allowed"
+        >
+          <i class="fa-brands fa-google"></i>
+          <span>Google no disponible</span>
+        </button>
+      )}
+
+      <p class="mt-5 text-center text-xs text-zinc-400">
+        Solo usuarios autorizados pueden acceder a este panel.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <p class="text-center text-xs text-zinc-400 mt-6">
+      &copy; {new Date().getFullYear()} A1 Marketing. Todos los derechos reservados.
+    </p>
+  </div>
+
+</body>
+</html>

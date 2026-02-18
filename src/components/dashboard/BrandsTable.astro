@@ -45,7 +45,7 @@ const getSlug = (name: string) => uniqueBrands.find(b => name.includes(b.name) |
                     return (
                         <tr class="hover:bg-zinc-50/50 transition-colors group">
                             <td class="px-4 py-3 font-medium text-zinc-900">
-                                <a href={`/dashboard/${getSlug(brandName)}`} class="flex items-center gap-2.5 hover:text-blue-600 transition-colors">
+                                <a href={`/${getSlug(brandName)}`} class="flex items-center gap-2.5 hover:text-blue-600 transition-colors">
                                     <span class="w-7 h-7 rounded-lg bg-zinc-100 flex items-center justify-center text-sm shrink-0">
                                         🦷
                                     </span>
