@@ -1,12 +1,17 @@
 ---
 import { getUniqueBrands } from '../../lib/api';
 import { getBrandsRanking } from '../../lib/data-service';
-import { formatMoney, formatNumber } from '../../lib/format';
+import { formatMoney } from '../../lib/format';
 
+interface Props {
+  year?: string;
+  month?: number;
+}
+
+const { year = "2026", month = 1 } = Astro.props;
 const brands = await getUniqueBrands();
-const records = await getBrandsRanking({ year: "2026", month: 1 });
+const records = await getBrandsRanking({ year, month });
 
-// Create a map of brand data for quick lookup
 const brandDataMap = new Map(
   records.map(r => [r.brand || r.nombre_cuenta, r])
 );
@@ -38,19 +43,22 @@ const brandDataMap = new Map(
 
   <!-- Brand cards list -->
   <div class="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
+    {brands.length === 0 && (
+      <p class="text-xs text-zinc-400 text-center py-8">Sin marcas disponibles</p>
+    )}
     {brands.map(brand => {
       const data = brandDataMap.get(brand.name);
       const gasto = data?.cost_total_mes || 0;
       const leads = data?.leads_total_mes || 0;
 
       return (
-        <a href={`/dashboard/${brand.slug}`} class="block group">
-          <div class="p-3 rounded-xl border border-zinc-200 hover:border-zinc-300 hover:shadow-sm bg-white transition-all">
+        <div class="p-3 rounded-xl border border-zinc-200 hover:border-zinc-300 hover:shadow-sm bg-white transition-all">
+          <a href={`/dashboard/${brand.slug}`} class="block group mb-2">
             <div class="flex items-center gap-2.5 mb-2">
               <div class="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center text-base">
-                {brand.emoji}
+                🦷
               </div>
-              <span class="font-semibold text-sm text-zinc-800 truncate">{brand.name}</span>
+              <span class="font-semibold text-sm text-zinc-800 truncate group-hover:text-blue-600 transition-colors">{brand.name}</span>
             </div>
 
             <div class="flex items-center gap-4 text-[11px] text-zinc-500">
@@ -63,15 +71,15 @@ const brandDataMap = new Map(
                 <span class="font-semibold text-zinc-700">{leads}</span>
               </div>
             </div>
+          </a>
 
-            <div class="flex justify-end mt-2">
-              <div class="flex rounded-md border border-zinc-200 overflow-hidden text-[10px]">
-                <button class="px-2 py-0.5 bg-zinc-900 text-white font-medium">Mes</button>
-                <button class="px-2 py-0.5 bg-white text-zinc-500 font-medium hover:bg-zinc-50">Año</button>
-              </div>
+          <div class="flex justify-end">
+            <div class="flex rounded-md border border-zinc-200 overflow-hidden text-[10px]">
+              <a href={`/dashboard/${brand.slug}`} class="px-2 py-0.5 bg-zinc-900 text-white font-medium hover:bg-zinc-700 transition">Mes</a>
+              <a href={`/dashboard/${brand.slug}/year`} class="px-2 py-0.5 bg-white text-zinc-500 font-medium hover:bg-zinc-50 transition">Año</a>
             </div>
           </div>
-        </a>
+        </div>
       );
     })}
   </div>

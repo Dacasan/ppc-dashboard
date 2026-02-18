@@ -34,24 +34,28 @@ const currentPath = Astro.url.pathname;
     const isActive = currentPath.includes(`/dashboard/${brand.slug}`);
 
     return (
-      <a href={`/dashboard/${brand.slug}`} class="block">
-        <div class:list={[
-          "p-3 rounded-xl border transition-colors",
-          isActive ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-white border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50'
-        ]}>
+      <div class:list={[
+        "p-3 rounded-xl border transition-colors",
+        isActive ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-white border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50'
+      ]}>
+        <a href={`/dashboard/${brand.slug}`} class="block mb-2">
           <div class="flex items-center gap-2.5 mb-1.5">
             <span class:list={[
               "w-8 h-8 rounded-lg flex items-center justify-center text-base",
               isActive ? 'bg-zinc-700' : 'bg-zinc-100'
-            ]}>{brand.emoji}</span>
+            ]}>🦷</span>
             <span class:list={["font-semibold text-sm", isActive ? 'text-white' : 'text-zinc-800']}>{brand.name}</span>
           </div>
           <div class:list={["flex gap-4 text-[11px]", isActive ? 'text-zinc-400' : 'text-zinc-500']}>
             <span>Gasto: <span class:list={["font-semibold", isActive ? 'text-zinc-200' : 'text-zinc-700']}>{formatMoney(gasto)}</span></span>
             <span>Leads: <span class:list={["font-semibold", isActive ? 'text-zinc-200' : 'text-zinc-700']}>{leads}</span></span>
           </div>
+        </a>
+        <div class="flex rounded-md border border-zinc-200 overflow-hidden text-[10px]">
+          <a href={`/dashboard/${brand.slug}`} class="flex-1 text-center py-0.5 bg-zinc-900 text-white font-medium">Mes</a>
+          <a href={`/dashboard/${brand.slug}/year`} class="flex-1 text-center py-0.5 bg-white text-zinc-500 font-medium hover:bg-zinc-50">Año</a>
         </div>
-      </a>
+      </div>
     );
   })}
 </div>
