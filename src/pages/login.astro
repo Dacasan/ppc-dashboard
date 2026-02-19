@@ -126,7 +126,7 @@ try {
 
       <!-- Heading -->
       <h1 class="text-2xl font-black text-zinc-900 mb-1.5">Bienvenido de vuelta</h1>
-      <p class="text-zinc-500 text-sm mb-8">Accede con tu cuenta de Google corporativa</p>
+      <p class="text-zinc-500 text-sm mb-8">Accede con tu cuenta corporativa</p>
 
       <!-- Error message -->
       {errorMsg && (
@@ -170,6 +170,59 @@ try {
         </button>
       )}
 
+      <!-- Divider -->
+      <div class="flex items-center gap-3 my-5">
+        <div class="flex-1 h-px bg-zinc-200"></div>
+        <span class="text-xs text-zinc-400 font-medium">o continúa con email</span>
+        <div class="flex-1 h-px bg-zinc-200"></div>
+      </div>
+
+      <!-- Email / Password form -->
+      <form method="POST" action="/api/login" class="flex flex-col gap-3" id="email-login-form">
+        <div class="flex flex-col gap-1">
+          <label for="email" class="text-xs font-semibold text-zinc-600">Correo electrónico</label>
+          <input
+            id="email"
+            type="email"
+            name="email"
+            required
+            autocomplete="email"
+            placeholder="tu@empresa.com"
+            class="w-full px-3.5 py-3 rounded-xl border border-zinc-200 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+          />
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <label for="password" class="text-xs font-semibold text-zinc-600">Contraseña</label>
+          <div class="relative">
+            <input
+              id="password"
+              type="password"
+              name="password"
+              required
+              autocomplete="current-password"
+              placeholder="••••••••"
+              class="w-full px-3.5 py-3 pr-10 rounded-xl border border-zinc-200 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+            />
+            <button
+              type="button"
+              id="toggle-password"
+              class="absolute inset-y-0 right-3 flex items-center text-zinc-400 hover:text-zinc-600 transition"
+              aria-label="Mostrar u ocultar contraseña"
+            >
+              <i id="eye-icon" class="fa-solid fa-eye text-sm"></i>
+            </button>
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          class="mt-1 w-full px-4 py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-sm font-semibold rounded-xl transition-all duration-200 shadow-sm"
+        >
+          Iniciar sesión
+        </button>
+      </form>
+
       <p class="mt-6 text-center text-xs text-zinc-400">
         Solo usuarios autorizados pueden acceder a este panel.
       </p>
@@ -181,5 +234,18 @@ try {
     </div>
   </div>
 
+<script>
+  const toggleBtn = document.getElementById('toggle-password');
+  const passwordInput = document.getElementById('password') as HTMLInputElement | null;
+  const eyeIcon = document.getElementById('eye-icon');
+
+  toggleBtn?.addEventListener('click', () => {
+    if (!passwordInput || !eyeIcon) return;
+    const isHidden = passwordInput.type === 'password';
+    passwordInput.type = isHidden ? 'text' : 'password';
+    eyeIcon.classList.toggle('fa-eye', !isHidden);
+    eyeIcon.classList.toggle('fa-eye-slash', isHidden);
+  });
+</script>
 </body>
 </html>

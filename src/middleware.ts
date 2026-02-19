@@ -1,7 +1,7 @@
 import { defineMiddleware } from 'astro:middleware';
 
 // Routes that don't require authentication
-const PUBLIC_ROUTES = ['/login', '/auth/callback', '/auth/logout'];
+const PUBLIC_ROUTES = ['/login', '/auth/callback', '/auth/logout', '/api/login'];
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url;
