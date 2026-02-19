@@ -1,264 +1,223 @@
 ---
-import DashboardLayout from '../layouts/DashboardLayout.astro';
+// src/pages/debug-leads.astro
 import { pb } from '../lib/pb';
 
-// ==========================================
-// 🚀 ZONA DE BACKEND (Se ejecuta en el servidor)
-// ==========================================
+// --- DIAGNOSTICOS ---
+const diagnostics: Record<string, string> = {};
+const pageLoadStart = Date.now();
 
-const user = Astro.locals.user || {};
-const userRole = user.role || 'marketing';
-const isAdmin = userRole === 'admin';
+// 1. Verificar token
+const token = import.meta.env.POCKETBASE_TOKEN || (typeof process !== 'undefined' ? process.env.POCKETBASE_TOKEN : undefined);
+diagnostics['POCKETBASE_TOKEN'] = token ? `Configurado (${token.substring(0, 15)}...)` : 'NO ENCONTRADO';
+diagnostics['authStore.isValid'] = String(pb.authStore.isValid);
+diagnostics['PocketBase URL'] = 'https://a1-pocketbase.adwebcrm.com';
 
-// 1. LÓGICA DE FECHAS
-const url = Astro.url;
-const now = new Date();
-const defaultMonth = now.getMonth() + 1;
-const defaultYear = String(now.getFullYear());
-
-const monthParam = parseInt(url.searchParams.get('month') || String(defaultMonth));
-const yearParam = url.searchParams.get('year') || defaultYear;
-
-const month = isNaN(monthParam) || monthParam < 1 || monthParam > 12 ? defaultMonth : monthParam;
-const year = yearParam;
-
-const MONTH_NAMES = [
-  '', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-];
-
-const ENGLISH_MONTHS = [
-  '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-];
-
-// Opciones del selector
-const AVAILABLE_YEARS = [2026, 2025, 2024, 2023];
-const monthYearOptions: { month: number; year: string; label: string }[] = [];
-for (const y of AVAILABLE_YEARS) {
-  const maxM = y === now.getFullYear() ? now.getMonth() + 1 : 12;
-  for (let m = maxM; m >= 1; m--) {
-    monthYearOptions.push({ month: m, year: String(y), label: `${MONTH_NAMES[m]} ${y}` });
-  }
+let pbHealthy = false;
+try {
+    const health = await pb.health.check();
+    pbHealthy = true;
+    diagnostics['PB Health'] = `OK - code: ${health.code}`;
+} catch (e) {
+    diagnostics['PB Health'] = `ERROR: ${String(e)}`;
 }
 
-let marcasAgrupadas: any[] = [];
-let error = null;
+// 2. Traer Leads
+let allLeads: any[] = [];
+let queryError = '';
+let dbQueryStart = 0;
+let dbQueryEnd = 0;
 
 try {
     pb.autoCancellation(false);
-
-    // 2. FILTRAR Y TRAER DATOS
-    // El texto que buscaremos en la columna "Semana", ej: "Feb 2026"
-    const targetMonthText = `${ENGLISH_MONTHS[month]} ${year}`; 
-
-    // A. TRAER CAMPAÑAS (Para el costo) - Asumo que tienes una forma de filtrarlos por mes en 'campaigns'
-    // Aquí usamos tus bloques cost_01_05, etc.
-    const campañas = await pb.collection('campaigns').getFullList({
-        filter: `tipo_registro="Marca" && month_num=${month} && year="${year}"`
+    dbQueryStart = Date.now();
+    // Traemos los últimos 500 leads para no saturar la memoria en modo debug pero tener buenos datos
+    const records = await pb.collection('leads_report').getList(1, 500, {
+        sort: '-created'
     });
-
-    // B. TRAER LEADS (Para el conteo real)
-    // Traemos TODOS los leads donde el campo "Semana" contenga "Feb 2026"
-    const rawLeads = await pb.collection('leads_report').getFullList({
-        filter: `Semana ~ "${targetMonthText}"`
-    });
-
-    // 3. AGRUPAR TODO EN UN OBJETO GIGANTE POR MARCA
-    const resumen: Record<string, any> = {};
-
-    // Primero metemos los datos de campañas (el gasto y la estructura)
-    campañas.forEach(camp => {
-        const brand = camp.brand || 'UNKNOWN';
-        if (!resumen[brand]) {
-            resumen[brand] = {
-                brand: brand,
-                total_leads_mes: 0, // Lo calcularemos con los reales
-                cost_total_mes: camp.cost_total_mes || 0,
-                // Semanas de costo
-                costos: {
-                    '1-5': camp.cost_01_05 || 0,
-                    '6-10': camp.cost_06_10 || 0,
-                    '11-15': camp.cost_11_15 || 0,
-                    '16-20': camp.cost_16_20 || 0,
-                    '21-25': camp.cost_21_25 || 0,
-                    '26-31': camp.cost_26_31 || 0
-                },
-                // Semanas de leads reales (empiezan en 0)
-                leads: {
-                    '1-5': 0, '6-10': 0, '11-15': 0, '16-20': 0, '21-25': 0, '26-31': 0
-                }
-            };
-        }
-    });
-
-    // Ahora mapeamos los leads reales de Airtable/n8n y los acomodamos en su bloque
-    rawLeads.forEach(lead => {
-        // Asumo que el brand de campaña coincide con el brand del lead.
-        // Si no, usa lead.Dominio o como lo mapees. Aquí usaré lead.brand
-        const brand = lead.brand; 
-        if (!brand) return;
-
-        // Si llegó un lead de una marca que no tiene campaña, le creamos su espacio
-        if (!resumen[brand]) {
-            resumen[brand] = {
-                brand: brand, total_leads_mes: 0, cost_total_mes: 0,
-                costos: { '1-5': 0, '6-10': 0, '11-15': 0, '16-20': 0, '21-25': 0, '26-31': 0 },
-                leads: { '1-5': 0, '6-10': 0, '11-15': 0, '16-20': 0, '21-25': 0, '26-31': 0 }
-            };
-        }
-
-        resumen[brand].total_leads_mes++;
-
-        // Detectar a qué bloque pertenece según el texto de "Semana" (ej: "16-20 Feb 2026")
-        const sem = lead.Semana || '';
-        if (sem.startsWith('1-5') || sem.startsWith('01-05')) resumen[brand].leads['1-5']++;
-        else if (sem.startsWith('6-10') || sem.startsWith('06-10')) resumen[brand].leads['6-10']++;
-        else if (sem.startsWith('11-15')) resumen[brand].leads['11-15']++;
-        else if (sem.startsWith('16-20')) resumen[brand].leads['16-20']++;
-        else if (sem.startsWith('21-25')) resumen[brand].leads['21-25']++;
-        else if (sem.startsWith('26-') || sem.startsWith('26')) resumen[brand].leads['26-31']++;
-    });
-
-    marcasAgrupadas = Object.values(resumen).sort((a: any, b: any) => b.total_leads_mes - a.total_leads_mes);
-
+    allLeads = records.items;
+    dbQueryEnd = Date.now();
+    diagnostics['Query Leads (Ultimos 500)'] = `OK - ${allLeads.length} registros en ${dbQueryEnd - dbQueryStart}ms`;
 } catch (e: any) {
-    console.error("Error al traer datos:", e);
-    error = e.message;
+    queryError = String(e);
+    diagnostics['Query Leads'] = `ERROR: ${queryError}`;
 }
 
-// ==========================================
-// 🧠 FUNCIONES FRONTEND
-// ==========================================
-const formatMoney = (val: number) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val);
+// 3. Procesar estadísticas (Agrupación simple, sin duplicados)
+const resumen: Record<string, any> = {};
 
-function getCplBadge(cost: number, leads: number) {
-    if (leads === 0) {
-        if (cost > 0) return { label: 'ALTO (0 LEADS)', class: 'bg-rose-50 text-rose-700 border-rose-200' };
-        return { label: 'SIN DATOS', class: 'bg-zinc-50 text-zinc-400 border-zinc-200' };
+allLeads.forEach(lead => {
+    const dominio = lead.Dominio || 'Desconocido';
+    const semana = lead.Semana || 'Sin semana';
+    
+    // Llave única para juntar Dominio y Semana
+    const key = `${dominio}|${semana}`;
+
+    if (!resumen[key]) {
+        resumen[key] = {
+            dominio: dominio,
+            semana: semana,
+            brand: lead.brand || '',
+            totalLeads: 0
+        };
     }
-    const cpl = cost / leads;
-    if (cpl < 150) return { label: 'CPL BAJO', class: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
-    if (cpl <= 350) return { label: 'PROMEDIO', class: 'bg-amber-50 text-amber-700 border-amber-200' };
-    return { label: 'CPL ALTO', class: 'bg-rose-50 text-rose-700 border-rose-200' };
-}
 
-const periodKeys = [
-    { label: '1 - 5', key: '1-5' }, { label: '6 - 10', key: '6-10' },
-    { label: '11 - 15', key: '11-15' }, { label: '16 - 20', key: '16-20' },
-    { label: '21 - 25', key: '21-25' }, { label: '26 - Fin', key: '26-31' }
-];
+    // Como Airtable ya los filtró, todos valen 1 y son reales.
+    resumen[key].totalLeads++;
+});
+
+// Convertir a lista y ordenar alfabéticamente por dominio y luego por semana
+const groupedLeads = Object.values(resumen).sort((a: any, b: any) => {
+    if (a.dominio < b.dominio) return -1;
+    if (a.dominio > b.dominio) return 1;
+    if (a.semana < b.semana) return -1;
+    if (a.semana > b.semana) return 1;
+    return 0;
+});
+
+const pageLoadEnd = Date.now();
 ---
 
-<DashboardLayout>
-    <div class="p-6 max-w-7xl mx-auto">
-        
-        <section class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-8">
-            <div>
-                <div class="flex items-center gap-3 flex-wrap">
-                    <h1 class="text-2xl md:text-3xl font-black text-zinc-900 tracking-tight">
-                        Rendimiento Marketing
-                    </h1>
-                    <span class="text-zinc-300 font-light text-2xl md:text-3xl">—</span>
-                    
-                    <div class="relative">
-                        <select id="month-year-selector" class="appearance-none text-xl md:text-2xl font-black text-blue-600 bg-transparent border-none cursor-pointer pr-8 focus:outline-none hover:text-blue-700 transition-colors">
-                            {monthYearOptions.map(opt => (
-                                <option value={`${opt.month}-${opt.year}`} selected={opt.month === month && opt.year === year}>
-                                    {opt.label}
-                                </option>
-                            ))}
-                        </select>
-                        <i class="fa-solid fa-chevron-down absolute right-1 top-1/2 -translate-y-1/2 text-blue-500 text-sm pointer-events-none"></i>
-                    </div>
-                </div>
-                <p class="text-zinc-400 text-xs mt-1 font-medium">Flujo de prospectos por bloques semanales de cada unidad de negocio.</p>
-            </div>
-            
-            <div class={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium shadow-sm transition-colors ${isAdmin ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
-                <i class={`fa-solid ${isAdmin ? 'fa-unlock-keyhole' : 'fa-shield-halved'}`}></i>
-                Vista: {isAdmin ? 'Dirección (Gasto Visible)' : 'Marketing (Gasto Oculto)'}
-            </div>
-        </section>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>DEBUG LEADS - PPC Dashboard</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: monospace; padding: 20px; background: #111; color: #eee; max-width: 1600px; margin: 0 auto; }
+        h1 { color: #0f0; border-bottom: 2px solid #0f0; padding-bottom: 10px; font-size: 20px; }
+        h2 { margin-top: 40px; background: #222; color: #0f0; padding: 10px; border-left: 4px solid #0f0; font-size: 14px; }
+        h3 { color: #0f0; margin-top: 25px; font-size: 13px; border-bottom: 1px solid #333; padding-bottom: 6px; }
+        p { font-size: 13px; line-height: 1.5; }
 
-        {error ? (
-            <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Error: {error}</div>
-        ) : (
-            <div class="flex flex-col gap-6">
-                {marcasAgrupadas.length > 0 ? marcasAgrupadas.map(record => (
-                    
-                    <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
-                        
-                        <div class="bg-zinc-50 border-b border-zinc-200 px-6 py-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-lg bg-zinc-900 text-white flex items-center justify-center font-black text-sm shadow-sm">{record.brand}</div>
-                                <h2 class="font-black text-lg text-zinc-900">{record.brand === 'GLOBAL' ? 'Resumen Global' : `Marca: ${record.brand}`}</h2>
-                            </div>
-                            
-                            <div class="flex items-center gap-4 bg-white px-4 py-2 rounded-lg border border-zinc-200">
-                                <div class="flex flex-col">
-                                    <span class="text-[10px] uppercase font-bold text-zinc-400 tracking-wide">Total Leads Mes</span>
-                                    <span class="text-base font-black text-zinc-900">{record.total_leads_mes} <i class="fa-solid fa-users text-blue-500 text-xs ml-1"></i></span>
-                                </div>
-                                {isAdmin && (
-                                    <>
-                                        <div class="w-px h-8 bg-zinc-200 mx-2"></div>
-                                        <div class="flex flex-col text-right">
-                                            <span class="text-[10px] uppercase font-bold text-zinc-400 tracking-wide">Inversión Mes</span>
-                                            <span class="text-base font-black text-blue-600">{formatMoney(record.cost_total_mes)}</span>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                        
-                        <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 divide-y md:divide-y-0 md:divide-x divide-zinc-100">
-                            {periodKeys.map(pk => {
-                                const leads = record.leads[pk.key];
-                                const cost = record.costos[pk.key];
-                                const badge = getCplBadge(cost, leads);
+        .diag-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+        .diag-table td { border: 1px solid #333; padding: 8px 12px; font-size: 12px; }
+        .diag-table td:first-child { font-weight: bold; color: #888; width: 220px; }
+        .ok { color: #0f0; }
+        .fail { color: #f44; font-weight: bold; }
+        .warn { color: #ff0; }
 
-                                return (
-                                    <div class="p-5 flex flex-col items-center justify-center text-center hover:bg-zinc-50/50 transition-colors">
-                                        <div class="flex items-center gap-1.5 text-xs font-bold text-zinc-400 mb-3 uppercase tracking-wider">
-                                            <i class="fa-regular fa-calendar text-[10px]"></i> Días {pk.label}
-                                        </div>
-                                        <span class="text-3xl font-black text-zinc-900 tracking-tight leading-none mb-3">
-                                            {leads} <span class="text-xs font-bold text-zinc-400 ml-0.5">L</span>
-                                        </span>
-                                        {isAdmin ? (
-                                            <div class="w-full bg-blue-50/50 border border-blue-100 px-3 py-1.5 rounded-lg text-sm font-bold text-blue-600">{formatMoney(cost)}</div>
-                                        ) : (
-                                            <div class={`w-full border px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${badge.class}`}>{badge.label}</div>
-                                        )}
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    </div>
-                )) : (
-                    <div class="bg-white rounded-2xl border border-zinc-200 p-12 text-center">
-                        <i class="fa-solid fa-chart-bar text-zinc-300 text-5xl mb-4"></i>
-                        <p class="text-zinc-500 text-sm font-medium">No hay registros para este mes.</p>
-                    </div>
-                )}
-            </div>
-        )}
+        table.data { width: 100%; border-collapse: collapse; background: #1a1a1a; font-size: 12px; margin-bottom: 20px; }
+        table.data th, table.data td { border: 1px solid #333; padding: 6px; text-align: right; }
+        table.data th { background: #222; text-align: center; font-weight: bold; color: #0f0; }
+        table.data td.text { text-align: left; color: #ccc; }
+        .val { font-weight: bold; color: #fff; }
+
+        .debug-json { background: #0a0a0a; color: #0f0; padding: 15px; overflow-x: auto; max-height: 400px; border: 1px solid #333; font-size: 11px; margin-bottom: 20px; }
+        .alert { background: #441111; border: 1px solid #f44; color: #faa; padding: 15px; margin: 20px 0; border-radius: 4px; font-size: 13px; }
+
+        /* Section nav */
+        .section-nav { background: #1a1a1a; border: 1px solid #333; padding: 12px; margin-bottom: 30px; display: flex; flex-wrap: wrap; gap: 8px; }
+        .section-nav a { color: #0f0; text-decoration: none; font-size: 11px; padding: 4px 10px; border: 1px solid #333; background: #222; transition: all 0.2s; }
+        .section-nav a:hover { background: #0f0; color: #111; }
+
+        /* Tabs para JSON */
+        .tab-container { margin-bottom: 20px; }
+        .tab-buttons { display: flex; gap: 0; margin-bottom: 0; }
+        .tab-btn { background: #1a1a1a; color: #666; border: 1px solid #333; border-bottom: none; padding: 8px 16px; cursor: pointer; font-family: monospace; font-size: 12px; transition: all 0.2s; }
+        .tab-btn:hover { color: #0f0; background: #222; }
+        .tab-btn.active { color: #0f0; background: #0a0a0a; border-color: #0f0; font-weight: bold; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+    </style>
+</head>
+<body>
+
+    <h1>DEBUG LEADS: X-Ray de Contactos de n8n</h1>
+    <p>Diagnosticos de la coleccion <code>leads_report</code> - {new Date().toISOString()}</p>
+    <p style="color: #666;">Page render: {pageLoadEnd - pageLoadStart}ms</p>
+
+    <div class="section-nav">
+        <a href="#s1">[1] Sistema</a>
+        <a href="#s2">[2] Agrupación y Sumas</a>
+        <a href="#s3">[3] JSON Samples</a>
     </div>
-</DashboardLayout>
 
-<script>
-    function init() {
-        const sel = document.getElementById('month-year-selector') as HTMLSelectElement | null;
-        if (!sel) return;
-        sel.addEventListener('change', () => {
-            const [m, y] = sel.value.split('-');
-            const url = new URL(window.location.href);
-            url.searchParams.set('month', m);
-            url.searchParams.set('year', y);
-            window.location.href = url.toString();
+    <h2 id="s1">1. Diagnosticos del Sistema</h2>
+    <table class="diag-table">
+        {Object.entries(diagnostics).map(([key, value]) => (
+            <tr>
+                <td>{key}</td>
+                <td class={value.includes('ERROR') || value.includes('NO ENCONTRADO') || value === 'false' ? 'fail' : 'ok'}>
+                    {value}
+                </td>
+            </tr>
+        ))}
+    </table>
+
+    {queryError && (
+        <div class="alert">
+            <strong>ERROR DE DB:</strong> {queryError}
+        </div>
+    )}
+
+    <h2 id="s2">2. Leads Agrupados (Dominio + Semana)</h2>
+    <p style="color: #888;">Los datos mostrados están limpios de duplicados desde Airtable. El servidor solo cuenta y agrupa.</p>
+
+    {groupedLeads.length === 0 ? (
+        <p class="fail">No se encontraron leads.</p>
+    ) : (
+        <table class="data">
+            <thead>
+                <tr>
+                    <th>Dominio</th>
+                    <th>Marca (Brand)</th>
+                    <th>Semana</th>
+                    <th>Total Leads Únicos</th>
+                </tr>
+            </thead>
+            <tbody>
+                {groupedLeads.map(r => (
+                    <tr>
+                        <td class="text"><strong>{r.dominio}</strong></td>
+                        <td class="text">{r.brand}</td>
+                        <td class="text" style="color: #0ff;">{r.semana}</td>
+                        <td class="val">{r.totalLeads}</td>
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    )}
+
+    <h2 id="s3">3. RAW JSON SAMPLES</h2>
+    <p style="color: #888;">Auditoría de campos exactos que están llegando desde n8n a PocketBase.</p>
+
+    <div class="tab-container">
+        <div class="tab-buttons">
+            <button class="tab-btn active" data-tab="tab-list">LISTA RAW (Muestra de 1 Lead)</button>
+            <button class="tab-btn" data-tab="tab-group">ARRAY DE AGRUPACIÓN (Dashboard)</button>
+        </div>
+
+        <div id="tab-list" class="tab-content active">
+            <div class="debug-json">
+                <pre>{JSON.stringify(allLeads.length > 0 ? allLeads[0] : "No hay leads", null, 4)}</pre>
+            </div>
+            {allLeads.length > 0 && <p style="color: #666; margin-top: 8px;">Mostrando 1 de los {allLeads.length} leads obtenidos en la consulta.</p>}
+        </div>
+
+        <div id="tab-group" class="tab-content">
+            <div class="debug-json">
+                <pre>{JSON.stringify(groupedLeads, null, 4)}</pre>
+            </div>
+            <p style="color: #666; margin-top: 8px;">Así es como el servidor de Astro procesa la tabla final antes de dibujarla.</p>
+        </div>
+    </div>
+
+    <p style="color: #333; margin-top: 40px; text-align: center;">--- END DEBUG LEADS MODE ---</p>
+
+    <script>
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabId = btn.getAttribute('data-tab');
+                if (!tabId) return;
+
+                btn.closest('.tab-container')?.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.closest('.tab-container')?.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+                btn.classList.add('active');
+                document.getElementById(tabId)?.classList.add('active');
+            });
         });
-    }
-    init();
-    document.addEventListener('astro:after-swap', init);
-</script>
+    </script>
+</body>
+</html>
