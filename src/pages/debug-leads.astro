@@ -30,13 +30,28 @@ let dbQueryEnd = 0;
 try {
     pb.autoCancellation(false);
     dbQueryStart = Date.now();
-    // Traemos los últimos 500 leads para no saturar la memoria en modo debug pero tener buenos datos
-    const records = await pb.collection('leads_report').getList(1, 500, {
+    
+    // Traemos 2000 leads para tener un buen historial de varios meses
+    const records = await pb.collection('leads_report').getList(1, 2000, {
         sort: '-created'
     });
+    
     allLeads = records.items;
+    
+    // SISTEMA ANTI-MESES CORTADOS:
+    // Si trajimos 2000 registros exactos, significa que el último mes está incompleto.
+    // Vamos a identificar cuál es ese mes viejo y lo eliminamos de la data para que los demás salgan perfectos.
+    if (allLeads.length === 2000) {
+        const oldestLead = allLeads[allLeads.length - 1];
+        const mesCortado = oldestLead.Mes_Ano; // Ej: "January 2025"
+        if (mesCortado) {
+            allLeads = allLeads.filter(lead => lead.Mes_Ano !== mesCortado);
+            diagnostics['Filtro Anti-Cortes'] = `Mes incompleto ignorado: ${mesCortado}`;
+        }
+    }
+    
     dbQueryEnd = Date.now();
-    diagnostics['Query Leads (Ultimos 500)'] = `OK - ${allLeads.length} registros en ${dbQueryEnd - dbQueryStart}ms`;
+    diagnostics['Query Leads (Procesados)'] = `OK - ${allLeads.length} registros válidos en ${dbQueryEnd - dbQueryStart}ms`;
 } catch (e: any) {
     queryError = String(e);
     diagnostics['Query Leads'] = `ERROR: ${queryError}`;
@@ -65,13 +80,32 @@ allLeads.forEach(lead => {
     resumen[key].totalLeads++;
 });
 
-// Convertir a lista y ordenar alfabéticamente por dominio y luego por semana
+// Convertir a lista y ordenar:
+// 1ro. Alfabéticamente por dominio
+// 2do. Cronológicamente por semana (De más reciente a más viejo)
 const groupedLeads = Object.values(resumen).sort((a: any, b: any) => {
+    // Ordenar por Dominio (A-Z)
     if (a.dominio < b.dominio) return -1;
     if (a.dominio > b.dominio) return 1;
-    if (a.semana < b.semana) return -1;
-    if (a.semana > b.semana) return 1;
-    return 0;
+    
+    // Función helper para convertir "16-20 Feb 2026" a un timestamp real de JavaScript
+    const getWeekTimestamp = (semanaStr: string) => {
+        if (!semanaStr || semanaStr === 'Sin semana') return 0;
+        const parts = semanaStr.split(' '); // ["16-20", "Feb", "2026"]
+        if (parts.length >= 3) {
+            const startDay = parts[0].split('-')[0]; // "16"
+            const month = parts[1]; // "Feb"
+            const year = parts[2]; // "2026"
+            return new Date(`${month} ${startDay}, ${year}`).getTime();
+        }
+        return 0;
+    };
+
+    const timeA = getWeekTimestamp(a.semana);
+    const timeB = getWeekTimestamp(b.semana);
+    
+    // Ordenar de más reciente (mayor) a más viejo (menor)
+    return timeB - timeA;
 });
 
 const pageLoadEnd = Date.now();
@@ -152,7 +186,7 @@ const pageLoadEnd = Date.now();
     )}
 
     <h2 id="s2">2. Leads Agrupados (Dominio + Semana)</h2>
-    <p style="color: #888;">Los datos mostrados están limpios de duplicados desde Airtable. El servidor solo cuenta y agrupa.</p>
+    <p style="color: #888;">Ordenado por Marca (A-Z) y luego de Más Reciente a Más Viejo cronológicamente.</p>
 
     {groupedLeads.length === 0 ? (
         <p class="fail">No se encontraron leads.</p>
@@ -162,7 +196,7 @@ const pageLoadEnd = Date.now();
                 <tr>
                     <th>Dominio</th>
                     <th>Marca (Brand)</th>
-                    <th>Semana</th>
+                    <th>Semana (Periodo)</th>
                     <th>Total Leads Únicos</th>
                 </tr>
             </thead>
