@@ -1,0 +1,49 @@
+---
+import DashboardLayout from '../layouts/DashboardLayout.astro';
+import { pb } from '../lib/pb';
+
+// 1. ZONA DE SERVIDOR (Backend)
+let rawLeads = [];
+let error = null;
+
+try {
+    // Apagamos la auto-cancelación por seguridad en el servidor
+    pb.autoCancellation(false);
+
+    // Traemos solo 50 para no saturar la pantalla. 
+    // Si quisieras todos usarías getFullList()
+    const records = await pb.collection('leads_report').getList(1, 50, {
+        sort: '-created', // Ordenar por los más recientes primero
+    });
+    
+    rawLeads = records.items;
+
+} catch (e: any) {
+    console.error("Error al buscar los leads:", e);
+    error = e.message;
+}
+---
+
+<DashboardLayout>
+    <div class="p-6">
+        <div class="flex items-center gap-3 mb-6">
+            <h1 class="text-3xl font-black text-amber-500">🐛 DEBUG LEADS</h1>
+            <span class="bg-amber-100 text-amber-800 text-xs font-bold px-2 py-1 rounded">Prueba Fea</span>
+        </div>
+        
+        <p class="mb-4 text-zinc-600">
+            Aquí están los datos crudos exactamente como vienen de tu colección <code>leads_report</code>. 
+            Fíjate bien en cómo se llaman las "llaves" (ej. <code>Email</code>, <code>email</code>, <code>correo_electronico</code>) para usarlas en el código final.
+        </p>
+
+        {error ? (
+            <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4">
+                <strong>Ocurrió un error de conexión:</strong> {error}
+            </div>
+        ) : (
+            <div class="bg-zinc-950 text-green-400 p-4 rounded-xl font-mono text-xs overflow-x-auto shadow-inner max-h-[70vh] overflow-y-auto">
+                <pre>{JSON.stringify(rawLeads, null, 2)}</pre>
+            </div>
+        )}
+    </div>
+</DashboardLayout>
