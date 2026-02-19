@@ -1,5 +1,6 @@
 import { defineMiddleware } from 'astro:middleware';
 import PocketBase from 'pocketbase';
+import { pb as adminPb } from './lib/pb';
 
 // Routes that don't require authentication
 const PUBLIC_ROUTES = ['/login', '/auth/callback', '/auth/logout', '/api/login'];
@@ -134,11 +135,24 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
       // Expose verified user info
       const record = authResult.record;
+
+      // Fetch role using admin PB client to guarantee we get the field
+      // (user-scoped authRefresh may not return custom fields depending on API rules)
+      let role = record.role || '';
+      if (!role && record.id) {
+        try {
+          const fullRecord = await adminPb.collection('users').getOne(record.id);
+          role = fullRecord.role || '';
+        } catch {
+          // If admin fetch fails, keep whatever authRefresh returned
+        }
+      }
+
       context.locals.user = {
         id: record.id,
         email: record.email || '',
         name: record.name || record.email || 'Usuario',
-        role: record.role || 'marketing', // <--- ESTA LÍNEA ES LA MAGIA
+        role: role || 'marketing',
       };
     } catch {
       // Token invalid or revoked

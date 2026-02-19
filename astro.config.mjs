@@ -23,9 +23,9 @@ export default defineConfig({
     clientAddressResolution: 'x-forwarded-for'
   },
 
-  // 3. Mantenemos la seguridad estricta encendida
+  // 3. CSRF origin check desactivado: CapRover/Nginx reescribe cabeceras Origin/Host
+  //    lo que causa que Astro rechace formularios legítimos.
   security: {
-    // APAGAMOS ESTO TEMPORALMENTE para que te deje pasar el formulario
     checkOrigin: false
   }
 });

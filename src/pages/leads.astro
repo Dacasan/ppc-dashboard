@@ -10,15 +10,6 @@ const user = Astro.locals.user || {};
 const userRole = user.role || 'marketing';
 const isAdmin = userRole === 'admin';
 
-// 👇 PEGA ESTO EXACTAMENTE AQUÍ (Línea 11) 👇
-let usuarioCrudo = null;
-try {
-    if (user.id) {
-        usuarioCrudo = await pb.collection('users').getOne(user.id);
-    }
-} catch(e) {}
-// 👆 ------------------------------------ 👆
-
 // 1. LÓGICA DE FECHAS
 const url = Astro.url;
 const now = new Date();
@@ -162,12 +153,6 @@ const periodKeys = [
 <DashboardLayout>
     <div class="p-6 max-w-7xl mx-auto">
 
-<div class="bg-black text-green-400 p-4 rounded-xl font-mono text-xs mb-6 overflow-x-auto border border-green-800">
-            <p class="text-white mb-2 font-bold">// RADIOGRAFÍA DE TU USUARIO:</p>
-            <p class="text-yellow-400 mb-2">Lo que Astro lee: "{user.role}"</p>
-            <pre>{JSON.stringify(usuarioCrudo, null, 2)}</pre>
-        </div>
-        
         <section class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-8">
             <div>
                 <div class="flex items-center gap-3 flex-wrap">
