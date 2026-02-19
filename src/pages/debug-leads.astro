@@ -2,48 +2,143 @@
 import DashboardLayout from '../layouts/DashboardLayout.astro';
 import { pb } from '../lib/pb';
 
-// 1. ZONA DE SERVIDOR (Backend)
-let rawLeads = [];
+// ==========================================
+// 🚀 ZONA DE BACKEND (Se ejecuta en el servidor)
+// ==========================================
+
+const user = Astro.locals.user || {};
+const userRole = user.role || 'marketing';
+const isAdmin = userRole === 'admin';
+
+let groupedLeads: any[] = [];
 let error = null;
 
 try {
-    // Apagamos la auto-cancelación por seguridad en el servidor
     pb.autoCancellation(false);
 
-    // Traemos solo 50 para no saturar la pantalla. 
-    // Si quisieras todos usarías getFullList()
-    const records = await pb.collection('leads_report').getList(1, 50, {
-        sort: '-created', // Ordenar por los más recientes primero
+    // Traemos todos los leads
+    const records = await pb.collection('leads_report').getFullList();
+
+    // 2. AGRUPAR POR MARCA / DOMINIO
+    const resumenMarcas: Record<string, any> = {};
+
+    records.forEach(lead => {
+        // Usamos el campo Dominio para agrupar (ej. "ALGODONES", "PRIME")
+        const dominio = lead.Dominio || 'Desconocido';
+
+        if (!resumenMarcas[dominio]) {
+            resumenMarcas[dominio] = {
+                dominio: dominio,
+                codigoMarca: lead.brand || '', // ej. "ADG", "STJ"
+                totalLeads: 0,
+                leadsUnicos: 0,
+                duplicados: 0
+            };
+        }
+
+        // Sumamos 1 al total general de esa marca
+        resumenMarcas[dominio].totalLeads++;
+
+        // Revisamos tu campo 'Duplicado' para separarlos
+        if (lead.Duplicado === true) {
+            resumenMarcas[dominio].duplicados++;
+        } else {
+            resumenMarcas[dominio].leadsUnicos++;
+        }
     });
-    
-    rawLeads = records.items;
+
+    // Convertimos a lista y ordenamos de mayor a menor cantidad de leads totales
+    groupedLeads = Object.values(resumenMarcas).sort((a: any, b: any) => b.totalLeads - a.totalLeads);
 
 } catch (e: any) {
-    console.error("Error al buscar los leads:", e);
+    console.error("Error al agrupar los leads por marca:", e);
     error = e.message;
 }
+
+// ==========================================
+// 🎨 ZONA DE FRONTEND
+// ==========================================
 ---
 
 <DashboardLayout>
-    <div class="p-6">
-        <div class="flex items-center gap-3 mb-6">
-            <h1 class="text-3xl font-black text-amber-500">🐛 DEBUG LEADS</h1>
-            <span class="bg-amber-100 text-amber-800 text-xs font-bold px-2 py-1 rounded">Prueba Fea</span>
-        </div>
+    <div class="p-6 max-w-7xl mx-auto">
         
-        <p class="mb-4 text-zinc-600">
-            Aquí están los datos crudos exactamente como vienen de tu colección <code>leads_report</code>. 
-            Fíjate bien en cómo se llaman las "llaves" (ej. <code>Email</code>, <code>email</code>, <code>correo_electronico</code>) para usarlas en el código final.
-        </p>
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+            <div>
+                <h1 class="text-2xl font-black text-zinc-900 tracking-tight mb-1">Resumen de Leads por Marca</h1>
+                <p class="text-sm text-zinc-500">
+                    Volumen total de contactos recibidos agrupados por dominio de origen.
+                </p>
+            </div>
+            
+            <div class="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg border border-blue-100 text-sm font-medium">
+                <i class="fa-solid fa-user-shield"></i>
+                Vista: {isAdmin ? 'Administrador' : 'Marketing'}
+            </div>
+        </div>
 
         {error ? (
-            <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4">
-                <strong>Ocurrió un error de conexión:</strong> {error}
+            <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl">
+                <i class="fa-solid fa-triangle-exclamation mr-2"></i> Error: {error}
             </div>
         ) : (
-            <div class="bg-zinc-950 text-green-400 p-4 rounded-xl font-mono text-xs overflow-x-auto shadow-inner max-h-[70vh] overflow-y-auto">
-                <pre>{JSON.stringify(rawLeads, null, 2)}</pre>
+            <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-zinc-50 border-b border-zinc-200 text-xs uppercase tracking-wider text-zinc-500 font-semibold">
+                                <th class="px-6 py-4">Dominio / Marca</th>
+                                <th class="px-6 py-4 text-center">Total Leads (Crudos)</th>
+                                <th class="px-6 py-4 text-center">Leads Únicos (Reales)</th>
+                                <th class="px-6 py-4 text-center">Duplicados (Basura)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-zinc-100">
+                            {groupedLeads.length > 0 ? groupedLeads.map(marca => (
+                                <tr class="hover:bg-zinc-50 transition-colors">
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-10 h-10 rounded-lg bg-zinc-900 text-white flex items-center justify-center font-bold text-xs">
+                                                {marca.codigoMarca}
+                                            </div>
+                                            <div class="flex flex-col">
+                                                <span class="font-bold text-zinc-900 text-sm">{marca.dominio}</span>
+                                                <span class="text-xs text-zinc-500">Origen de datos</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 text-center">
+                                        <span class="inline-flex items-center justify-center px-3 py-1 rounded-full bg-zinc-100 text-zinc-700 font-bold text-sm">
+                                            {marca.totalLeads}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 text-center">
+                                        <span class="inline-flex items-center justify-center px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold text-sm border border-emerald-100">
+                                            {marca.leadsUnicos}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 text-center">
+                                        {marca.duplicados > 0 ? (
+                                            <span class="inline-flex items-center justify-center px-3 py-1 rounded-full bg-rose-50 text-rose-700 font-bold text-sm border border-rose-100">
+                                                {marca.duplicados}
+                                            </span>
+                                        ) : (
+                                            <span class="text-zinc-300 font-medium text-sm">-</span>
+                                        )}
+                                    </td>
+                                </tr>
+                            )) : (
+                                <tr>
+                                    <td colspan="4" class="px-6 py-12 text-center text-zinc-500 text-sm">
+                                        No se encontraron leads en la base de datos.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         )}
+
     </div>
 </DashboardLayout>
