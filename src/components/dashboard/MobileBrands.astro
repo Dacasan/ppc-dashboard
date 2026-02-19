@@ -1,6 +1,5 @@
 ---
-import { getUniqueBrands } from '../../lib/api';
-import { getBrandsRanking } from '../../lib/data-service';
+import { actions } from 'astro:actions';
 import { formatMoney } from '../../lib/format';
 
 interface Props {
@@ -9,11 +8,11 @@ interface Props {
 }
 
 const { year = "2026", month = 1 } = Astro.props;
-const brands = await getUniqueBrands();
-const records = await getBrandsRanking({ year, month });
+const { data: brands } = await Astro.callAction(actions.getUniqueBrands, undefined);
+const { data: records } = await Astro.callAction(actions.getBrandsRanking, { year, month });
 
 const brandDataMap = new Map(
-  records.map(r => [r.brand || r.nombre_cuenta, r])
+  (records ?? []).map(r => [r.brand || r.nombre_cuenta, r])
 );
 ---
 
@@ -21,11 +20,11 @@ const brandDataMap = new Map(
 <div class="lg:hidden">
   <div class="flex items-center justify-between mb-2">
     <h2 class="font-bold text-sm text-zinc-700">Marcas</h2>
-    <span class="text-[11px] text-zinc-400">{brands.length} activas</span>
+    <span class="text-[11px] text-zinc-400">{(brands ?? []).length} activas</span>
   </div>
 
   <div class="flex gap-2.5 overflow-x-auto pb-2 -mx-4 px-4 no-scrollbar snap-x snap-mandatory">
-    {brands.map(brand => {
+    {(brands ?? []).map(brand => {
       const data = brandDataMap.get(brand.name);
       const gasto = data?.cost_total_mes || 0;
       const leads = data?.leads_total_mes || 0;

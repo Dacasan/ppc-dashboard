@@ -3,21 +3,24 @@ import DashboardLayout from '../../layouts/DashboardLayout.astro';
 import BrandsSidebar from '../../components/dashboard/BrandsSidebar.astro';
 import MobileSidebarContent from '../../components/dashboard/MobileSidebarContent.astro';
 import Skeleton from '../../components/ui/Skeleton.astro';
-import { getUniqueBrands } from '../../lib/api';
-import { getBrandYearData } from '../../lib/data-service';
+import { actions } from 'astro:actions';
 import { formatMoney, formatNumber, getCplColor } from '../../lib/format';
 
 export const prerender = false;
 const { brand } = Astro.params;
 
-const brands = await getUniqueBrands();
-const currentBrand = brands.find(b => b.slug === brand);
+const { data: brands } = await Astro.callAction(actions.getUniqueBrands, undefined);
+const currentBrand = brands?.find(b => b.slug === brand);
 if (!currentBrand) return Astro.redirect('/');
 
 const url = Astro.url;
 const year = url.searchParams.get('year') || '2026';
 
-const { totalSpend, totalLeads, avgCPL, monthlyReports } = await getBrandYearData(currentBrand.name, { year });
+const { data: yearData } = await Astro.callAction(actions.getBrandYearData, { brandName: currentBrand.name, year });
+const totalSpend = yearData?.totalSpend ?? 0;
+const totalLeads = yearData?.totalLeads ?? 0;
+const avgCPL = yearData?.avgCPL ?? 0;
+const monthlyReports = yearData?.monthlyReports ?? [];
 
 const MONTH_NAMES: Record<number, string> = {
   1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',

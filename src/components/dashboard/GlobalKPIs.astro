@@ -1,5 +1,5 @@
 ---
-import { getGlobalStats } from '../../lib/data-service';
+import { actions } from 'astro:actions';
 import { formatMoney, formatNumber } from '../../lib/format';
 
 interface Props {
@@ -8,7 +8,10 @@ interface Props {
 }
 
 const { year = "2026", month = 1 } = Astro.props;
-const { totalSpend, totalLeads, avgCPL } = await getGlobalStats({ year, month });
+const { data: statsData } = await Astro.callAction(actions.getGlobalStats, { year, month });
+const totalSpend = statsData?.totalSpend ?? 0;
+const totalLeads = statsData?.totalLeads ?? 0;
+const avgCPL = statsData?.avgCPL ?? 0;
 const roas = 3.4;
 ---
 

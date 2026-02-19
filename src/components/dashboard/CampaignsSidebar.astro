@@ -1,5 +1,5 @@
 ---
-import { getAllCampaigns } from '../../lib/data-service';
+import { actions } from 'astro:actions';
 import { formatMoney, getChannelInfo } from '../../lib/format';
 
 interface Props {
@@ -8,7 +8,8 @@ interface Props {
 }
 
 const { year = "2026", month = 1 } = Astro.props;
-const campaigns = await getAllCampaigns({ year, month });
+const { data: campaignsData } = await Astro.callAction(actions.getAllCampaigns, { year, month });
+const campaigns = campaignsData ?? [];
 ---
 
 <aside class="hidden xl:flex flex-col w-[320px] shrink-0 bg-white border-l border-zinc-200 h-full overflow-hidden">
