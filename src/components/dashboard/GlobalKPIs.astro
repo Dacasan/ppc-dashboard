@@ -8,18 +8,32 @@ interface Props {
 }
 
 const { year = "2026", month = 1 } = Astro.props;
-// Sumar marcas individuales (sin GLOBAL) para KPIs reales
-const { data: brands } = await Astro.callAction(actions.getBrandsRanking, { year, month });
+
 let totalSpend = 0;
 let totalLeads = 0;
-(brands ?? []).forEach(b => {
-  totalSpend += b.cost_total_mes || 0;
-  totalLeads += b.leads_total_mes || 0;
-});
-const avgCPL = totalLeads > 0 ? totalSpend / totalLeads : 0;
+let avgCPL = 0;
 const roas = 3.4;
+let error: string | null = null;
+
+try {
+  const { data: brands } = await Astro.callAction(actions.getBrandsRanking, { year, month });
+  (brands ?? []).forEach(b => {
+    totalSpend += b.cost_total_mes || 0;
+    totalLeads += b.leads_total_mes || 0;
+  });
+  avgCPL = totalLeads > 0 ? totalSpend / totalLeads : 0;
+} catch (e: any) {
+  console.error('[GlobalKPIs] Error:', e?.message || e);
+  error = e?.message || 'Error al cargar KPIs';
+}
 ---
 
+{error ? (
+    <div class="bg-rose-50 border border-rose-200 rounded-xl p-6 text-center">
+        <i class="fa-solid fa-triangle-exclamation text-rose-400 text-xl mb-2"></i>
+        <p class="text-rose-600 text-sm font-medium">No se pudieron cargar los KPIs</p>
+    </div>
+) : (
 <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
 
     <!-- Gasto Total -->
@@ -79,3 +93,4 @@ const roas = 3.4;
     </div>
 
 </div>
+)}
