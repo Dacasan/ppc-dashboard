@@ -33,7 +33,7 @@ try {
     const redirectUrl = `${Astro.url.origin}/auth/callback`;
     // PocketBase authUrl already includes state + PKCE challenge; append redirect_uri
     googleAuthUrl = `${googleProvider.authUrl}${encodeURIComponent(redirectUrl)}`;
-
+    
     // Store codeVerifier and state so the callback can verify and exchange
     Astro.cookies.set('oauth_code_verifier', googleProvider.codeVerifier, {
       httpOnly: true,
@@ -42,6 +42,7 @@ try {
       maxAge: 600, // 10 min
       path: '/',
     });
+    
     Astro.cookies.set('oauth_state', googleProvider.state, {
       httpOnly: true,
       secure: Astro.url.protocol === 'https:',
@@ -69,26 +70,20 @@ try {
 </head>
 <body class="min-h-screen flex bg-white">
 
-  <!-- Left panel: branding + dashboard preview (desktop only) -->
   <div class="hidden lg:flex lg:w-3/5 relative overflow-hidden flex-col">
-    <!-- Dashboard background image -->
     <img
       src="/dashboard.jpg"
       alt="Vista previa del dashboard"
       class="absolute inset-0 w-full h-full object-cover object-top"
     />
-    <!-- Gradient overlay -->
     <div class="absolute inset-0 bg-gradient-to-br from-blue-950/90 via-blue-900/80 to-blue-700/70"></div>
 
-    <!-- Panel content -->
     <div class="relative z-10 flex flex-col justify-between h-full p-12">
-      <!-- Brand -->
       <div class="flex items-center gap-3">
         <img src="/logoa1.jpg" alt="A1 Marketing" class="w-11 h-11 rounded-xl object-cover shadow-lg" />
         <span class="text-2xl font-black text-white tracking-tight">A1 Marketing</span>
       </div>
 
-      <!-- Headline -->
       <div>
         <h2 class="text-5xl font-black text-white leading-tight mb-5">
           Panel de Control<br />de Campañas PPC
@@ -97,7 +92,6 @@ try {
           Visualiza el rendimiento de tus campañas de Google Ads con datos en tiempo real y reportes automáticos.
         </p>
 
-        <!-- Feature tags -->
         <div class="flex flex-wrap items-center gap-3 mt-8">
           {['Análisis en tiempo real', 'Multi-marca', 'Reportes automáticos', 'Google Ads'].map((tag) => (
             <span class="px-3 py-1.5 rounded-full bg-white/10 border border-white/20 text-white/80 text-xs font-medium backdrop-blur-sm">
@@ -107,28 +101,23 @@ try {
         </div>
       </div>
 
-      <!-- Footer note -->
       <p class="text-blue-300/60 text-xs">
         &copy; {new Date().getFullYear()} A1 Marketing. Todos los derechos reservados.
       </p>
     </div>
   </div>
 
-  <!-- Right panel: login form -->
   <div class="w-full lg:w-2/5 flex items-center justify-center p-8 bg-white">
     <div class="w-full max-w-sm">
 
-      <!-- Logo (visible on all screens) -->
       <div class="flex items-center gap-3 mb-10">
         <img src="/logoa1.jpg" alt="A1 Marketing" class="w-10 h-10 rounded-xl object-cover shadow-sm" />
         <span class="text-xl font-black text-zinc-900 tracking-tight">A1 Marketing</span>
       </div>
 
-      <!-- Heading -->
       <h1 class="text-2xl font-black text-zinc-900 mb-1.5">Bienvenido de vuelta</h1>
       <p class="text-zinc-500 text-sm mb-8">Accede con tu cuenta corporativa</p>
 
-      <!-- Error message -->
       {errorMsg && (
         <div class="mb-5 flex items-start gap-2.5 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">
           <i class="fa-solid fa-circle-exclamation mt-0.5 shrink-0"></i>
@@ -136,7 +125,6 @@ try {
         </div>
       )}
 
-      <!-- Setup error -->
       {setupError && (
         <div class="mb-5 flex items-start gap-2.5 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">
           <i class="fa-solid fa-triangle-exclamation mt-0.5 shrink-0"></i>
@@ -144,13 +132,11 @@ try {
         </div>
       )}
 
-      <!-- Google OAuth Button -->
       {googleAuthUrl ? (
         <a
           href={googleAuthUrl}
           class="flex items-center justify-center gap-3 w-full px-4 py-3.5 bg-white border-2 border-zinc-200 rounded-xl text-sm font-semibold text-zinc-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 group shadow-sm"
         >
-          <!-- Google SVG icon -->
           <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -170,15 +156,13 @@ try {
         </button>
       )}
 
-      <!-- Divider -->
       <div class="flex items-center gap-3 my-5">
         <div class="flex-1 h-px bg-zinc-200"></div>
         <span class="text-xs text-zinc-400 font-medium">o continúa con email</span>
         <div class="flex-1 h-px bg-zinc-200"></div>
       </div>
 
-      <!-- Email / Password form -->
-      <form method="POST" action="/api/login" class="flex flex-col gap-3" id="email-login-form">
+      <form method="POST" action="/api/login" class="flex flex-col gap-3">
         <div class="flex flex-col gap-1">
           <label for="email" class="text-xs font-semibold text-zinc-600">Correo electrónico</label>
           <input
@@ -227,7 +211,6 @@ try {
         Solo usuarios autorizados pueden acceder a este panel.
       </p>
 
-      <!-- Mobile footer -->
       <p class="lg:hidden text-center text-xs text-zinc-400 mt-12">
         &copy; {new Date().getFullYear()} A1 Marketing. Todos los derechos reservados.
       </p>
@@ -235,10 +218,11 @@ try {
   </div>
 
 <script>
+  // Este script solo maneja el ojito de la contraseña, no interfiere con el envío seguro
   const toggleBtn = document.getElementById('toggle-password');
   const passwordInput = document.getElementById('password') as HTMLInputElement | null;
   const eyeIcon = document.getElementById('eye-icon');
-
+  
   toggleBtn?.addEventListener('click', () => {
     if (!passwordInput || !eyeIcon) return;
     const isHidden = passwordInput.type === 'password';
