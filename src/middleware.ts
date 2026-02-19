@@ -138,6 +138,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
         id: record.id,
         email: record.email || '',
         name: record.name || record.email || 'Usuario',
+        role: record.role || 'marketing', // <--- ESTA LÍNEA ES LA MAGIA
       };
     } catch {
       // Token invalid or revoked
