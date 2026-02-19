@@ -1,8 +1,19 @@
 import { defineMiddleware } from 'astro:middleware';
 import PocketBase from 'pocketbase';
+import { pb as adminPb } from './lib/pb';
 
 // Routes that don't require authentication
 const PUBLIC_ROUTES = ['/login', '/auth/callback', '/auth/logout', '/api/login'];
+
+// Routes allowed for marketing users (everything else requires admin)
+const MARKETING_ALLOWED = ['/leads', '/debug-leads', '/profile', '/auth/logout', '/api/change-password', '/api/request-recovery'];
+
+// --- CSRF Origin Check ---
+// Astro's built-in checkOrigin doesn't work behind CapRover/Nginx because
+// the proxy rewrites the request URL (internal origin ≠ browser Origin).
+// We implement our own check using the known site URL instead.
+const SITE_ORIGIN = import.meta.env.SITE ? new URL(import.meta.env.SITE).origin : '';
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 // --- Rate limiting (in-memory, per-process) ---
 const loginAttempts = new Map<string, { count: number; lastAttempt: number; blockedUntil: number }>();
@@ -65,6 +76,14 @@ export function recordLoginAttempt(ip: string, success: boolean) {
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url;
+
+  // CSRF: For mutating requests, verify Origin matches our site
+  if (!SAFE_METHODS.has(context.request.method)) {
+    const origin = context.request.headers.get('origin');
+    if (origin && SITE_ORIGIN && origin !== SITE_ORIGIN) {
+      return new Response('Forbidden – origin mismatch', { status: 403 });
+    }
+  }
 
   // Allow static assets and public routes
   if (
@@ -134,11 +153,24 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
       // Expose verified user info
       const record = authResult.record;
+
+      // Fetch role using admin PB client to guarantee we get the field
+      // (user-scoped authRefresh may not return custom fields depending on API rules)
+      let role = record.role || '';
+      if (!role && record.id) {
+        try {
+          const fullRecord = await adminPb.collection('users').getOne(record.id);
+          role = fullRecord.role || '';
+        } catch {
+          // If admin fetch fails, keep whatever authRefresh returned
+        }
+      }
+
       context.locals.user = {
         id: record.id,
         email: record.email || '',
         name: record.name || record.email || 'Usuario',
-        role: record.role || 'marketing', // <--- ESTA LÍNEA ES LA MAGIA
+        role: role || 'marketing',
       };
     } catch {
       // Token invalid or revoked
@@ -148,6 +180,15 @@ export const onRequest = defineMiddleware(async (context, next) => {
   } catch {
     context.cookies.delete('pb_auth', { path: '/' });
     return context.redirect('/login');
+  }
+
+  // Role-based access: marketing users can only access /leads and /profile
+  const userRole = context.locals.user?.role || 'marketing';
+  if (userRole !== 'admin') {
+    const allowed = MARKETING_ALLOWED.some(route => pathname === route || pathname.startsWith(route + '/'));
+    if (!allowed) {
+      return context.redirect('/leads');
+    }
   }
 
   return next();

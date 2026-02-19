@@ -23,9 +23,11 @@ export default defineConfig({
     clientAddressResolution: 'x-forwarded-for'
   },
 
-  // 3. Mantenemos la seguridad estricta encendida
+  // 3. CSRF: Astro's built-in checkOrigin compares Origin vs request.url.origin,
+  //    but behind CapRover/Nginx the internal URL (http://srv:3000) != browser Origin.
+  //    We keep this off and use our own origin check in middleware.ts instead,
+  //    which compares the browser Origin against the `site` config above.
   security: {
-    // APAGAMOS ESTO TEMPORALMENTE para que te deje pasar el formulario
     checkOrigin: false
   }
 });
