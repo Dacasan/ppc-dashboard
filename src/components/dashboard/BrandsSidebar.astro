@@ -74,8 +74,8 @@ const brandDataMap = new Map(
 
           <div class="flex justify-end">
             <div class="flex rounded-md border border-zinc-200 overflow-hidden text-[10px]">
-              <a href={`/${brand.slug}`} class="px-2 py-0.5 bg-zinc-900 text-white font-medium hover:bg-zinc-700 transition">Mes</a>
-              <a href={`/${brand.slug}/year`} class="px-2 py-0.5 bg-white text-zinc-500 font-medium hover:bg-zinc-50 transition">Año</a>
+              <a href={`/${brand.slug}?month=${month}&year=${year}`} class="px-2 py-0.5 bg-zinc-900 text-white font-medium hover:bg-zinc-700 transition">Mes</a>
+              <a href={`/${brand.slug}/year?year=${year}`} class="px-2 py-0.5 bg-white text-zinc-500 font-medium hover:bg-zinc-50 transition">Año</a>
             </div>
           </div>
         </div>

@@ -14,7 +14,9 @@ const currentBrand = brands?.find(b => b.slug === brand);
 if (!currentBrand) return Astro.redirect('/');
 
 const url = Astro.url;
-const year = url.searchParams.get('year') || '2026';
+const defaultYear = String(new Date().getFullYear());
+const year = url.searchParams.get('year') || defaultYear;
+const AVAILABLE_YEARS = [2026, 2025, 2024, 2023];
 
 // Filas mensuales pre-calculadas por el backend (cada fila es un CampaignReport de tipo "Marca")
 const { data: reportsData } = await Astro.callAction(actions.getBrandYearData, { brandName: currentBrand.name, year });
@@ -46,7 +48,7 @@ const MONTH_NAMES: Record<number, string> = {
     </BrandsSidebar>
 
     <!-- Mobile sidebar content -->
-    <MobileSidebarContent slot="mobile-sidebar" server:defer>
+    <MobileSidebarContent slot="mobile-sidebar" year={year} month={1} server:defer>
         <div slot="fallback" class="p-4"><Skeleton class="h-12 w-full mb-2" /><Skeleton class="h-12 w-full" /></div>
     </MobileSidebarContent>
 
@@ -59,7 +61,20 @@ const MONTH_NAMES: Record<number, string> = {
                 </div>
                 <div>
                     <h1 class="text-xl md:text-2xl font-bold text-zinc-900 leading-none">{currentBrand.name}</h1>
-                    <p class="text-xs text-zinc-400 mt-1">Resumen Anual {year}</p>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="text-xs text-zinc-400">Resumen Anual</span>
+                        <div class="relative">
+                            <select
+                                id="brand-year-selector"
+                                class="appearance-none text-xs font-semibold text-blue-600 bg-transparent border-none cursor-pointer pr-4 focus:outline-none hover:text-blue-700 transition-colors"
+                            >
+                                {AVAILABLE_YEARS.map(y => (
+                                    <option value={y} selected={String(y) === year}>{y}</option>
+                                ))}
+                            </select>
+                            <i class="fa-solid fa-chevron-down absolute right-0 top-1/2 -translate-y-1/2 text-blue-400 text-[8px] pointer-events-none"></i>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="flex items-center gap-2">
@@ -157,3 +172,18 @@ const MONTH_NAMES: Record<number, string> = {
         )}
     </div>
 </DashboardLayout>
+
+<script>
+    function initBrandYearSelector() {
+        const sel = document.getElementById('brand-year-selector') as HTMLSelectElement | null;
+        if (!sel) return;
+        sel.addEventListener('change', () => {
+            const url = new URL(window.location.href);
+            url.searchParams.set('year', sel.value);
+            window.location.href = url.toString();
+        });
+    }
+
+    initBrandYearSelector();
+    document.addEventListener('astro:after-swap', initBrandYearSelector);
+</script>

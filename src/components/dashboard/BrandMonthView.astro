@@ -33,7 +33,7 @@ const avgCPL = totalLeads > 0 ? totalSpend / totalLeads : 0;
     <div class="min-w-[70%] md:min-w-0 snap-center bg-white p-5 rounded-xl border border-zinc-200 shadow-sm shrink-0">
         <div class="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">CPL Promedio</div>
         <div class="text-3xl font-black text-zinc-900 mt-1">{formatMoney(avgCPL)}</div>
-        <div class="text-xs text-rose-500 mt-1">↑ 2.1% vs objetivo</div>
+        <div class="text-xs text-amber-600 mt-1">↑ 2.1% vs objetivo</div>
     </div>
 </div>
 
@@ -60,7 +60,7 @@ const avgCPL = totalLeads > 0 ? totalSpend / totalLeads : 0;
                             <td class="px-6 py-3 text-right font-mono text-zinc-600">{formatMoney(row.spend)}</td>
                             <td class="px-6 py-3 text-right font-bold text-zinc-900">{row.leads}</td>
                             <td class="px-6 py-3 text-right font-mono text-xs">
-                                <span class={`px-2 py-1 rounded border ${cpl > 1000 ? 'bg-red-50 text-red-700 border-red-100' : 'bg-green-50 text-green-700 border-green-100'}`}>
+                                <span class={`px-2 py-1 rounded border ${cpl > 1000 ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
                                     {formatMoney(cpl)}
                                 </span>
                             </td>

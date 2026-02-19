@@ -14,16 +14,28 @@ const { data: brands } = await Astro.callAction(actions.getUniqueBrands, undefin
 const currentBrand = brands?.find(b => b.slug === brand);
 if (!currentBrand) return Astro.redirect('/');
 
-// Read month/year from URL params, default to January 2026
+// Read month/year from URL params
 const url = Astro.url;
-const monthParam = parseInt(url.searchParams.get('month') || '1');
-const year = url.searchParams.get('year') || '2026';
-const month = isNaN(monthParam) || monthParam < 1 || monthParam > 12 ? 1 : monthParam;
+const now = new Date();
+const defaultMonth = now.getMonth() + 1;
+const defaultYear = String(now.getFullYear());
+const monthParam = parseInt(url.searchParams.get('month') || String(defaultMonth));
+const year = url.searchParams.get('year') || defaultYear;
+const month = isNaN(monthParam) || monthParam < 1 || monthParam > 12 ? defaultMonth : monthParam;
 
 const MONTH_NAMES = [
   '', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
+
+const AVAILABLE_YEARS = [2026, 2025, 2024, 2023];
+const monthYearOptions: { month: number; year: number; label: string }[] = [];
+for (const y of AVAILABLE_YEARS) {
+  const maxM = y === now.getFullYear() ? now.getMonth() + 1 : 12;
+  for (let m = maxM; m >= 1; m--) {
+    monthYearOptions.push({ month: m, year: y, label: `${MONTH_NAMES[m]} ${y}` });
+  }
+}
 
 const { data: brandData } = await Astro.callAction(actions.getBrandFullData, { brandName: currentBrand.name, year, month });
 const brandReport = brandData?.brandReport;
@@ -40,7 +52,7 @@ const campaigns = brandData?.campaigns ?? [];
     </BrandsSidebar>
 
     <!-- Mobile sidebar content -->
-    <MobileSidebarContent slot="mobile-sidebar" server:defer>
+    <MobileSidebarContent slot="mobile-sidebar" year={year} month={month} server:defer>
         <div slot="fallback" class="p-4"><Skeleton class="h-12 w-full mb-2" /><Skeleton class="h-12 w-full" /></div>
     </MobileSidebarContent>
 
@@ -54,19 +66,22 @@ const campaigns = brandData?.campaigns ?? [];
                 <div>
                     <h1 class="text-xl md:text-2xl font-bold text-zinc-900 leading-none">{currentBrand.name}</h1>
                     <div class="flex items-center gap-2 mt-1">
-                        <!-- Month dropdown for brand view -->
                         <div class="relative">
                             <select
-                                id="brand-month-selector"
+                                id="brand-month-year-selector"
                                 class="appearance-none text-xs text-zinc-500 bg-transparent border-none cursor-pointer pr-5 focus:outline-none hover:text-zinc-700 transition-colors"
                             >
-                                {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => (
-                                    <option value={m} selected={m === month}>{MONTH_NAMES[m]}</option>
+                                {monthYearOptions.map(opt => (
+                                    <option
+                                        value={`${opt.month}-${opt.year}`}
+                                        selected={opt.month === month && String(opt.year) === year}
+                                    >
+                                        {opt.label}
+                                    </option>
                                 ))}
                             </select>
                             <i class="fa-solid fa-chevron-down absolute right-0 top-1/2 -translate-y-1/2 text-zinc-400 text-[9px] pointer-events-none"></i>
                         </div>
-                        <span class="text-xs text-zinc-400">{year}</span>
                     </div>
                 </div>
             </div>
@@ -86,21 +101,23 @@ const campaigns = brandData?.campaigns ?? [];
             <div class="p-4 border border-yellow-200 bg-yellow-50 text-yellow-800 rounded-lg text-sm">Sin datos de Marca para {MONTH_NAMES[month]} {year}.</div>
         }
 
-        {campaigns.length > 0 && <CampaignsTable campaigns={campaigns} />}
+        {campaigns.length > 0 && <CampaignsTable campaigns={campaigns} brandSlug={currentBrand.slug} />}
     </div>
 </DashboardLayout>
 
 <script>
-    function initBrandMonthSelector() {
-        const sel = document.getElementById('brand-month-selector') as HTMLSelectElement | null;
+    function initBrandMonthYearSelector() {
+        const sel = document.getElementById('brand-month-year-selector') as HTMLSelectElement | null;
         if (!sel) return;
         sel.addEventListener('change', () => {
+            const [m, y] = sel.value.split('-');
             const url = new URL(window.location.href);
-            url.searchParams.set('month', sel.value);
+            url.searchParams.set('month', m);
+            url.searchParams.set('year', y);
             window.location.href = url.toString();
         });
     }
 
-    initBrandMonthSelector();
-    document.addEventListener('astro:after-swap', initBrandMonthSelector);
+    initBrandMonthYearSelector();
+    document.addEventListener('astro:after-swap', initBrandMonthYearSelector);
 </script>
