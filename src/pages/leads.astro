@@ -54,7 +54,7 @@ try {
 
     // A. TRAER CAMPAÑAS (Para el costo) - Asumo que tienes una forma de filtrarlos por mes en 'campaigns'
     // Aquí usamos tus bloques cost_01_05, etc.
-    const campañas = await pb.collection('campaigns').getFullList({
+    const campañas = await pb.collection('campaigns_reports').getFullList({
         filter: `tipo_registro="Marca" && month_num=${month} && year="${year}"`
     });
 
