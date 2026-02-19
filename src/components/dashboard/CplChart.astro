@@ -8,20 +8,38 @@ interface Props {
 }
 
 const { year = "2026", month = 1 } = Astro.props;
-const { data: records } = await Astro.callAction(actions.getBrandsRanking, { year, month });
 
-const brandsData = (records ?? []).map(r => ({
-  name: r.brand || r.nombre_cuenta,
-  cpl: r.leads_total_mes > 0 ? r.cost_total_mes / r.leads_total_mes : 0,
-  spend: r.cost_total_mes,
-  leads: r.leads_total_mes
-}));
+let brandsData: { name: string; cpl: number; spend: number; leads: number }[] = [];
+let maxCpl = 1;
+let maxSpend = 1;
+let maxLeads = 1;
+let error: string | null = null;
 
-const maxCpl = Math.max(...brandsData.map(b => b.cpl), 1);
-const maxSpend = Math.max(...brandsData.map(b => b.spend), 1);
-const maxLeads = Math.max(...brandsData.map(b => b.leads), 1);
+try {
+  const { data: records } = await Astro.callAction(actions.getBrandsRanking, { year, month });
+
+  brandsData = (records ?? []).map(r => ({
+    name: r.brand || r.nombre_cuenta,
+    cpl: r.leads_total_mes > 0 ? r.cost_total_mes / r.leads_total_mes : 0,
+    spend: r.cost_total_mes,
+    leads: r.leads_total_mes
+  }));
+
+  maxCpl = Math.max(...brandsData.map(b => b.cpl), 1);
+  maxSpend = Math.max(...brandsData.map(b => b.spend), 1);
+  maxLeads = Math.max(...brandsData.map(b => b.leads), 1);
+} catch (e: any) {
+  console.error('[CplChart] Error:', e?.message || e);
+  error = e?.message || 'Error al cargar grafico CPL';
+}
 ---
 
+{error ? (
+    <div class="bg-rose-50 border border-rose-200 rounded-xl p-6 text-center">
+        <i class="fa-solid fa-triangle-exclamation text-rose-400 text-xl mb-2"></i>
+        <p class="text-rose-600 text-sm font-medium">No se pudo cargar el grafico de CPL</p>
+    </div>
+) : (
 <div class="bg-white border border-zinc-200 rounded-xl shadow-sm overflow-hidden">
   <div class="p-5 border-b border-zinc-100 flex items-center justify-between">
     <h3 class="font-bold text-zinc-800">CPL por Marca</h3>
@@ -78,6 +96,7 @@ const maxLeads = Math.max(...brandsData.map(b => b.leads), 1);
     })}
   </div>
 </div>
+)}
 
 <script>
   function initCplChart() {

@@ -1,16 +1,18 @@
 ---
 import DashboardLayout from '../layouts/DashboardLayout.astro';
-import { pb } from '../lib/pb';
+import LeadsDataDefer from '../components/dashboard/LeadsDataDefer.astro';
+import Skeleton from '../components/ui/Skeleton.astro';
 
 // ==========================================
-// 🚀 ZONA DE BACKEND (Se ejecuta en el servidor)
+// PAGINA ESTATICA - Carga instantanea
+// La logica pesada vive en LeadsDataDefer (server:defer)
 // ==========================================
 
 const user = Astro.locals.user || {};
 const userRole = user.role || 'marketing';
 const isAdmin = userRole === 'admin';
 
-// 1. LÓGICA DE FECHAS
+// 1. LEER PARAMETROS DE URL
 const url = Astro.url;
 const now = new Date();
 const defaultMonth = now.getMonth() + 1;
@@ -27,11 +29,6 @@ const MONTH_NAMES = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
 
-const ENGLISH_MONTHS = [
-  '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-];
-
 // Opciones del selector
 const AVAILABLE_YEARS = [2026, 2025, 2024, 2023];
 const monthYearOptions: { month: number; year: string; label: string }[] = [];
@@ -41,126 +38,20 @@ for (const y of AVAILABLE_YEARS) {
     monthYearOptions.push({ month: m, year: String(y), label: `${MONTH_NAMES[m]} ${y}` });
   }
 }
-
-let marcasAgrupadas: any[] = [];
-let error = null;
-
-try {
-    pb.autoCancellation(false);
-
-    // 2. FILTRAR Y TRAER DATOS
-    // El texto que buscaremos en la columna "Semana", ej: "Feb 2026"
-    const targetMonthText = `${ENGLISH_MONTHS[month]} ${year}`; 
-
-    // A. TRAER CAMPAÑAS (Para el costo) - Asumo que tienes una forma de filtrarlos por mes en 'campaigns'
-    // Aquí usamos tus bloques cost_01_05, etc.
-    const campañas = await pb.collection('campaigns_reports').getFullList({
-        filter: `tipo_registro="Marca" && month_num=${month} && year="${year}"`
-    });
-
-    // B. TRAER LEADS (Para el conteo real)
-    // Traemos TODOS los leads donde el campo "Semana" contenga "Feb 2026"
-    const rawLeads = await pb.collection('leads_report').getFullList({
-        filter: `Semana ~ "${targetMonthText}"`
-    });
-
-    // 3. AGRUPAR TODO EN UN OBJETO GIGANTE POR MARCA
-    const resumen: Record<string, any> = {};
-
-    // Primero metemos los datos de campañas (el gasto y la estructura)
-    campañas.forEach(camp => {
-        const brand = camp.brand || 'UNKNOWN';
-        if (!resumen[brand]) {
-            resumen[brand] = {
-                brand: brand,
-                total_leads_mes: 0, // Lo calcularemos con los reales
-                cost_total_mes: camp.cost_total_mes || 0,
-                // Semanas de costo
-                costos: {
-                    '1-5': camp.cost_01_05 || 0,
-                    '6-10': camp.cost_06_10 || 0,
-                    '11-15': camp.cost_11_15 || 0,
-                    '16-20': camp.cost_16_20 || 0,
-                    '21-25': camp.cost_21_25 || 0,
-                    '26-31': camp.cost_26_31 || 0
-                },
-                // Semanas de leads reales (empiezan en 0)
-                leads: {
-                    '1-5': 0, '6-10': 0, '11-15': 0, '16-20': 0, '21-25': 0, '26-31': 0
-                }
-            };
-        }
-    });
-
-    // Ahora mapeamos los leads reales de Airtable/n8n y los acomodamos en su bloque
-    rawLeads.forEach(lead => {
-        // Asumo que el brand de campaña coincide con el brand del lead.
-        // Si no, usa lead.Dominio o como lo mapees. Aquí usaré lead.brand
-        const brand = lead.brand; 
-        if (!brand) return;
-
-        // Si llegó un lead de una marca que no tiene campaña, le creamos su espacio
-        if (!resumen[brand]) {
-            resumen[brand] = {
-                brand: brand, total_leads_mes: 0, cost_total_mes: 0,
-                costos: { '1-5': 0, '6-10': 0, '11-15': 0, '16-20': 0, '21-25': 0, '26-31': 0 },
-                leads: { '1-5': 0, '6-10': 0, '11-15': 0, '16-20': 0, '21-25': 0, '26-31': 0 }
-            };
-        }
-
-        resumen[brand].total_leads_mes++;
-
-        // Detectar a qué bloque pertenece según el texto de "Semana" (ej: "16-20 Feb 2026")
-        const sem = lead.Semana || '';
-        if (sem.startsWith('1-5') || sem.startsWith('01-05')) resumen[brand].leads['1-5']++;
-        else if (sem.startsWith('6-10') || sem.startsWith('06-10')) resumen[brand].leads['6-10']++;
-        else if (sem.startsWith('11-15')) resumen[brand].leads['11-15']++;
-        else if (sem.startsWith('16-20')) resumen[brand].leads['16-20']++;
-        else if (sem.startsWith('21-25')) resumen[brand].leads['21-25']++;
-        else if (sem.startsWith('26-') || sem.startsWith('26')) resumen[brand].leads['26-31']++;
-    });
-
-    marcasAgrupadas = Object.values(resumen).sort((a: any, b: any) => b.total_leads_mes - a.total_leads_mes);
-
-} catch (e: any) {
-    console.error("Error al traer datos:", e);
-    error = e.message;
-}
-
-// ==========================================
-// 🧠 FUNCIONES FRONTEND
-// ==========================================
-const formatMoney = (val: number) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val);
-
-function getCplBadge(cost: number, leads: number) {
-    if (leads === 0) {
-        if (cost > 0) return { label: 'ALTO (0 LEADS)', class: 'bg-rose-50 text-rose-700 border-rose-200' };
-        return { label: 'SIN DATOS', class: 'bg-zinc-50 text-zinc-400 border-zinc-200' };
-    }
-    const cpl = cost / leads;
-    if (cpl < 150) return { label: 'CPL BAJO', class: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
-    if (cpl <= 350) return { label: 'PROMEDIO', class: 'bg-amber-50 text-amber-700 border-amber-200' };
-    return { label: 'CPL ALTO', class: 'bg-rose-50 text-rose-700 border-rose-200' };
-}
-
-const periodKeys = [
-    { label: '1 - 5', key: '1-5' }, { label: '6 - 10', key: '6-10' },
-    { label: '11 - 15', key: '11-15' }, { label: '16 - 20', key: '16-20' },
-    { label: '21 - 25', key: '21-25' }, { label: '26 - Fin', key: '26-31' }
-];
 ---
 
 <DashboardLayout>
     <div class="p-6 max-w-7xl mx-auto">
 
+        <!-- Header estatico - se renderiza al instante -->
         <section class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-8">
             <div>
                 <div class="flex items-center gap-3 flex-wrap">
                     <h1 class="text-2xl md:text-3xl font-black text-zinc-900 tracking-tight">
                         Rendimiento Marketing
                     </h1>
-                    <span class="text-zinc-300 font-light text-2xl md:text-3xl">—</span>
-                    
+                    <span class="text-zinc-300 font-light text-2xl md:text-3xl">&mdash;</span>
+
                     <div class="relative">
                         <select id="month-year-selector" class="appearance-none text-xl md:text-2xl font-black text-blue-600 bg-transparent border-none cursor-pointer pr-8 focus:outline-none hover:text-blue-700 transition-colors">
                             {monthYearOptions.map(opt => (
@@ -174,76 +65,45 @@ const periodKeys = [
                 </div>
                 <p class="text-zinc-400 text-xs mt-1 font-medium">Flujo de prospectos por bloques semanales de cada unidad de negocio.</p>
             </div>
-            
+
             <div class={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium shadow-sm transition-colors ${isAdmin ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
                 <i class={`fa-solid ${isAdmin ? 'fa-unlock-keyhole' : 'fa-shield-halved'}`}></i>
-                Vista: {isAdmin ? 'Dirección (Gasto Visible)' : 'Marketing (Gasto Oculto)'}
+                Vista: {isAdmin ? 'Direccion (Gasto Visible)' : 'Marketing (Gasto Oculto)'}
             </div>
         </section>
 
-        {error ? (
-            <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Error: {error}</div>
-        ) : (
-            <div class="flex flex-col gap-6">
-                {marcasAgrupadas.length > 0 ? marcasAgrupadas.map(record => (
-                    
+        <!-- Server Island: los datos se cargan de forma asincrona -->
+        <LeadsDataDefer server:defer month={month} year={year}>
+            <!-- Fallback: esqueleto de carga visible al instante -->
+            <div slot="fallback" class="flex flex-col gap-6">
+                {[1, 2, 3].map(() => (
                     <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
-                        
+                        <!-- Header skeleton -->
                         <div class="bg-zinc-50 border-b border-zinc-200 px-6 py-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                             <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-lg bg-zinc-900 text-white flex items-center justify-center font-black text-sm shadow-sm">{record.brand}</div>
-                                <h2 class="font-black text-lg text-zinc-900">{record.brand === 'GLOBAL' ? 'Resumen Global' : `Marca: ${record.brand}`}</h2>
+                                <Skeleton class="w-10 h-10 rounded-lg" />
+                                <Skeleton class="h-5 w-32" />
                             </div>
-                            
                             <div class="flex items-center gap-4 bg-white px-4 py-2 rounded-lg border border-zinc-200">
-                                <div class="flex flex-col">
-                                    <span class="text-[10px] uppercase font-bold text-zinc-400 tracking-wide">Total Leads Mes</span>
-                                    <span class="text-base font-black text-zinc-900">{record.total_leads_mes} <i class="fa-solid fa-users text-blue-500 text-xs ml-1"></i></span>
-                                </div>
-                                {isAdmin && (
-                                    <>
-                                        <div class="w-px h-8 bg-zinc-200 mx-2"></div>
-                                        <div class="flex flex-col text-right">
-                                            <span class="text-[10px] uppercase font-bold text-zinc-400 tracking-wide">Inversión Mes</span>
-                                            <span class="text-base font-black text-blue-600">{formatMoney(record.cost_total_mes)}</span>
-                                        </div>
-                                    </>
-                                )}
+                                <Skeleton class="h-8 w-24" />
+                                {isAdmin && <Skeleton class="h-8 w-28" />}
                             </div>
                         </div>
-                        
+                        <!-- Period blocks skeleton -->
                         <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 divide-y md:divide-y-0 md:divide-x divide-zinc-100">
-                            {periodKeys.map(pk => {
-                                const leads = record.leads[pk.key];
-                                const cost = record.costos[pk.key];
-                                const badge = getCplBadge(cost, leads);
-
-                                return (
-                                    <div class="p-5 flex flex-col items-center justify-center text-center hover:bg-zinc-50/50 transition-colors">
-                                        <div class="flex items-center gap-1.5 text-xs font-bold text-zinc-400 mb-3 uppercase tracking-wider">
-                                            <i class="fa-regular fa-calendar text-[10px]"></i> Días {pk.label}
-                                        </div>
-                                        <span class="text-3xl font-black text-zinc-900 tracking-tight leading-none mb-3">
-                                            {leads} <span class="text-xs font-bold text-zinc-400 ml-0.5">L</span>
-                                        </span>
-                                        {isAdmin ? (
-                                            <div class="w-full bg-blue-50/50 border border-blue-100 px-3 py-1.5 rounded-lg text-sm font-bold text-blue-600">{formatMoney(cost)}</div>
-                                        ) : (
-                                            <div class={`w-full border px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${badge.class}`}>{badge.label}</div>
-                                        )}
-                                    </div>
-                                )
-                            })}
+                            {[1, 2, 3, 4, 5, 6].map(() => (
+                                <div class="p-5 flex flex-col items-center justify-center text-center">
+                                    <Skeleton class="h-3 w-16 mb-3" />
+                                    <Skeleton class="h-8 w-12 mb-3" />
+                                    <Skeleton class="h-7 w-full rounded-lg" />
+                                </div>
+                            ))}
                         </div>
                     </div>
-                )) : (
-                    <div class="bg-white rounded-2xl border border-zinc-200 p-12 text-center">
-                        <i class="fa-solid fa-chart-bar text-zinc-300 text-5xl mb-4"></i>
-                        <p class="text-zinc-500 text-sm font-medium">No hay registros para este mes.</p>
-                    </div>
-                )}
+                ))}
             </div>
-        )}
+        </LeadsDataDefer>
+
     </div>
 </DashboardLayout>
 

@@ -8,13 +8,32 @@ interface Props {
 }
 
 const { year = "2026", month = 1 } = Astro.props;
-const { data: records } = await Astro.callAction(actions.getBrandsRanking, { year, month });
 
-const { data: uniqueBrands } = await Astro.callAction(actions.getUniqueBrands, undefined);
-const getSlug = (name: string) => (uniqueBrands ?? []).find(b => name.includes(b.name) || b.name.includes(name))?.slug
+let records: any[] = [];
+let uniqueBrands: any[] = [];
+let error: string | null = null;
+
+try {
+  const { data: recordsData } = await Astro.callAction(actions.getBrandsRanking, { year, month });
+  records = recordsData ?? [];
+
+  const { data: brandsData } = await Astro.callAction(actions.getUniqueBrands, undefined);
+  uniqueBrands = brandsData ?? [];
+} catch (e: any) {
+  console.error('[BrandsTable] Error:', e?.message || e);
+  error = e?.message || 'Error al cargar tabla de marcas';
+}
+
+const getSlug = (name: string) => uniqueBrands.find(b => name.includes(b.name) || b.name.includes(name))?.slug
   || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 ---
 
+{error ? (
+    <div class="bg-rose-50 border border-rose-200 rounded-xl p-6 text-center">
+        <i class="fa-solid fa-triangle-exclamation text-rose-400 text-xl mb-2"></i>
+        <p class="text-rose-600 text-sm font-medium">No se pudo cargar la tabla de marcas</p>
+    </div>
+) : (
 <div class="bg-white border border-zinc-200 rounded-xl shadow-sm overflow-hidden">
     <div class="p-4 border-b border-zinc-100 flex justify-between items-center">
         <h3 class="font-bold text-zinc-800 text-sm">Rendimiento por Marca</h3>
@@ -37,7 +56,7 @@ const getSlug = (name: string) => (uniqueBrands ?? []).find(b => name.includes(b
                 </tr>
             </thead>
             <tbody class="divide-y divide-zinc-100">
-                {(records ?? []).map((brand) => {
+                {records.map((brand) => {
                     const cpl = brand.leads_total_mes > 0 ? brand.cost_total_mes / brand.leads_total_mes : 0;
                     const ctr = (Math.random() * 3 + 1).toFixed(1);
                     const brandName = brand.brand || brand.nombre_cuenta;
@@ -72,3 +91,4 @@ const getSlug = (name: string) => (uniqueBrands ?? []).find(b => name.includes(b
         </table>
     </div>
 </div>
+)}

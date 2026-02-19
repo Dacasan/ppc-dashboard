@@ -8,45 +8,62 @@ interface Props {
 }
 
 const { year = "2026", month = 1 } = Astro.props;
-const { data: brands } = await Astro.callAction(actions.getUniqueBrands, undefined);
-const { data: records } = await Astro.callAction(actions.getBrandsRanking, { year, month });
 
-const brandDataMap = new Map(
-  (records ?? []).map(r => [r.brand || r.nombre_cuenta, r])
-);
+let brands: any[] = [];
+let brandDataMap = new Map<string, any>();
+let error: string | null = null;
+
+try {
+  const { data: brandsData } = await Astro.callAction(actions.getUniqueBrands, undefined);
+  brands = brandsData ?? [];
+
+  const { data: records } = await Astro.callAction(actions.getBrandsRanking, { year, month });
+  brandDataMap = new Map(
+    (records ?? []).map(r => [r.brand || r.nombre_cuenta, r])
+  );
+} catch (e: any) {
+  console.error('[MobileBrands] Error:', e?.message || e);
+  error = e?.message || 'Error al cargar marcas';
+}
 ---
 
 <!-- Mobile horizontal scroll brands (visible only on smaller screens) -->
 <div class="lg:hidden">
   <div class="flex items-center justify-between mb-2">
     <h2 class="font-bold text-sm text-zinc-700">Marcas</h2>
-    <span class="text-[11px] text-zinc-400">{(brands ?? []).length} activas</span>
+    <span class="text-[11px] text-zinc-400">{brands.length} activas</span>
   </div>
 
-  <div class="flex gap-2.5 overflow-x-auto pb-2 -mx-4 px-4 no-scrollbar snap-x snap-mandatory">
-    {(brands ?? []).map(brand => {
-      const data = brandDataMap.get(brand.name);
-      const gasto = data?.cost_total_mes || 0;
-      const leads = data?.leads_total_mes || 0;
+  {error ? (
+    <div class="bg-rose-50 border border-rose-200 rounded-xl p-4 text-center">
+      <p class="text-xs text-rose-500">Error al cargar marcas</p>
+    </div>
+  ) : (
+    <div class="flex gap-2.5 overflow-x-auto pb-2 -mx-4 px-4 no-scrollbar snap-x snap-mandatory">
+      {brands.map(brand => {
+        const data = brandDataMap.get(brand.name);
+        const gasto = data?.cost_total_mes || 0;
+        const leads = data?.leads_total_mes || 0;
 
-      return (
-        <div class="snap-start shrink-0 w-[170px] p-3 rounded-xl border border-zinc-200 bg-white hover:border-zinc-300 hover:shadow-sm transition-all">
-          <a href={`/${brand.slug}`} class="block mb-2">
-            <div class="flex items-center gap-2 mb-2">
-              <span class="w-7 h-7 rounded-lg bg-zinc-100 flex items-center justify-center text-sm">🦷</span>
-              <span class="font-semibold text-xs text-zinc-800 truncate">{brand.name}</span>
+        return (
+          <div class="snap-start shrink-0 w-[170px] p-3 rounded-xl border border-zinc-200 bg-white hover:border-zinc-300 hover:shadow-sm transition-all">
+            <a href={`/${brand.slug}`} class="block mb-2">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="w-7 h-7 rounded-lg bg-zinc-100 flex items-center justify-center text-sm">🦷</span>
+                <span class="font-semibold text-xs text-zinc-800 truncate">{brand.name}</span>
+              </div>
+              <div class="text-[10px] text-zinc-500 space-y-0.5">
+                <div>Gasto: <span class="font-semibold text-zinc-700">{formatMoney(gasto)}</span></div>
+                <div>Leads: <span class="font-semibold text-zinc-700">{leads}</span></div>
+              </div>
+            </a>
+            <div class="flex rounded-md border border-zinc-200 overflow-hidden text-[10px]">
+              <a href={`/${brand.slug}`} class="flex-1 text-center py-0.5 bg-zinc-900 text-white font-medium">Mes</a>
+              <a href={`/${brand.slug}/year`} class="flex-1 text-center py-0.5 bg-white text-zinc-500 font-medium hover:bg-zinc-50">Año</a>
             </div>
-            <div class="text-[10px] text-zinc-500 space-y-0.5">
-              <div>Gasto: <span class="font-semibold text-zinc-700">{formatMoney(gasto)}</span></div>
-              <div>Leads: <span class="font-semibold text-zinc-700">{leads}</span></div>
-            </div>
-          </a>
-          <div class="flex rounded-md border border-zinc-200 overflow-hidden text-[10px]">
-            <a href={`/${brand.slug}`} class="flex-1 text-center py-0.5 bg-zinc-900 text-white font-medium">Mes</a>
-            <a href={`/${brand.slug}/year`} class="flex-1 text-center py-0.5 bg-white text-zinc-500 font-medium hover:bg-zinc-50">Año</a>
           </div>
-        </div>
-      );
-    })}
-  </div>
+        );
+      })}
+    </div>
+  )}
 </div>

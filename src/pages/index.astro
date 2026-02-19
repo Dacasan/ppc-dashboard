@@ -35,8 +35,22 @@ for (const y of AVAILABLE_YEARS) {
     monthYearOptions.push({ month: m, year: y, label: `${MONTH_NAMES[m]} ${y}` });
   }
 }
-const { data: brandsRanking } = await Astro.callAction(actions.getBrandsRanking, { year, month });
-const { data: campaigns } = await Astro.callAction(actions.getAllCampaigns, { year, month });
+// Wrap top-level data fetching in try/catch to prevent page crash
+// if PocketBase is down or a collection doesn't exist
+let brandsRanking: any[] | null = null;
+let campaigns: any[] | null = null;
+try {
+  const brandsResult = await Astro.callAction(actions.getBrandsRanking, { year, month });
+  brandsRanking = brandsResult.data ?? null;
+} catch (e: any) {
+  console.error('[index] Error fetching brandsRanking:', e?.message || e);
+}
+try {
+  const campaignsResult = await Astro.callAction(actions.getAllCampaigns, { year, month });
+  campaigns = campaignsResult.data ?? null;
+} catch (e: any) {
+  console.error('[index] Error fetching campaigns:', e?.message || e);
+}
 const activeBrands = brandsRanking?.length ?? 0;
 ---
 
