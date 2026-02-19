@@ -1,5 +1,5 @@
 ---
-import { getBrandsRanking } from '../../lib/data-service';
+import { actions } from 'astro:actions';
 import { formatMoney } from '../../lib/format';
 
 interface Props {
@@ -8,9 +8,9 @@ interface Props {
 }
 
 const { year = "2026", month = 1 } = Astro.props;
-const records = await getBrandsRanking({ year, month });
+const { data: records } = await Astro.callAction(actions.getBrandsRanking, { year, month });
 
-const brandsData = records.map(r => ({
+const brandsData = (records ?? []).map(r => ({
   name: r.brand || r.nombre_cuenta,
   cpl: r.leads_total_mes > 0 ? r.cost_total_mes / r.leads_total_mes : 0,
   spend: r.cost_total_mes,

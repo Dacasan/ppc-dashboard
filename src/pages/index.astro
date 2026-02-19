@@ -9,7 +9,7 @@ import BrandsTable from '../components/dashboard/BrandsTable.astro';
 import MobileBrands from '../components/dashboard/MobileBrands.astro';
 import MobileCampaigns from '../components/dashboard/MobileCampaigns.astro';
 import Skeleton from '../components/ui/Skeleton.astro';
-import { getGlobalStats, getAllCampaigns } from '../lib/data-service';
+import { actions } from 'astro:actions';
 
 // Read month/year from URL params, defaulting to January 2026
 const url = Astro.url;
@@ -22,8 +22,10 @@ const MONTH_NAMES = [
   '', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
-const { activeBrands } = await getGlobalStats({ year, month });
-const campaigns = await getAllCampaigns({ year, month });
+const { data: globalRecord } = await Astro.callAction(actions.getGlobalStats, { year, month });
+const { data: brandsRanking } = await Astro.callAction(actions.getBrandsRanking, { year, month });
+const { data: campaigns } = await Astro.callAction(actions.getAllCampaigns, { year, month });
+const activeBrands = brandsRanking?.length ?? 0;
 ---
 
 <DashboardLayout title="Resumen Global | A1 Marketing">
@@ -72,7 +74,7 @@ const campaigns = await getAllCampaigns({ year, month });
                 <span class="text-2xl md:text-3xl font-black text-zinc-500">{year}</span>
             </div>
             <p class="text-zinc-400 text-xs mt-1 font-medium">
-                {activeBrands} marcas · {campaigns.length} campañas activas
+                {activeBrands} marcas · {campaigns?.length ?? 0} campañas activas
             </p>
         </div>
         <div class="flex gap-2">

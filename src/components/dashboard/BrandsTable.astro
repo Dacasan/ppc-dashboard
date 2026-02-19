@@ -1,7 +1,6 @@
 ---
-import { getBrandsRanking } from '../../lib/data-service';
+import { actions } from 'astro:actions';
 import { formatMoney, getCplColor } from '../../lib/format';
-import { getUniqueBrands } from '../../lib/api';
 
 interface Props {
   year?: string;
@@ -9,10 +8,10 @@ interface Props {
 }
 
 const { year = "2026", month = 1 } = Astro.props;
-const records = await getBrandsRanking({ year, month });
+const { data: records } = await Astro.callAction(actions.getBrandsRanking, { year, month });
 
-const uniqueBrands = await getUniqueBrands();
-const getSlug = (name: string) => uniqueBrands.find(b => name.includes(b.name) || b.name.includes(name))?.slug
+const { data: uniqueBrands } = await Astro.callAction(actions.getUniqueBrands, undefined);
+const getSlug = (name: string) => (uniqueBrands ?? []).find(b => name.includes(b.name) || b.name.includes(name))?.slug
   || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 ---
 
@@ -38,7 +37,7 @@ const getSlug = (name: string) => uniqueBrands.find(b => name.includes(b.name) |
                 </tr>
             </thead>
             <tbody class="divide-y divide-zinc-100">
-                {records.map((brand) => {
+                {(records ?? []).map((brand) => {
                     const cpl = brand.leads_total_mes > 0 ? brand.cost_total_mes / brand.leads_total_mes : 0;
                     const ctr = (Math.random() * 3 + 1).toFixed(1);
                     const brandName = brand.brand || brand.nombre_cuenta;

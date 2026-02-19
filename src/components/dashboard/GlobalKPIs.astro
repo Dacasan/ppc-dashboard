@@ -1,5 +1,5 @@
 ---
-import { getGlobalStats } from '../../lib/data-service';
+import { actions } from 'astro:actions';
 import { formatMoney, formatNumber } from '../../lib/format';
 
 interface Props {
@@ -8,7 +8,11 @@ interface Props {
 }
 
 const { year = "2026", month = 1 } = Astro.props;
-const { totalSpend, totalLeads, avgCPL } = await getGlobalStats({ year, month });
+// Fetch del registro GLOBAL pre-calculado (una sola fila)
+const { data: global } = await Astro.callAction(actions.getGlobalStats, { year, month });
+const totalSpend = global?.cost_total_mes ?? 0;
+const totalLeads = global?.leads_total_mes ?? 0;
+const avgCPL = totalLeads > 0 ? totalSpend / totalLeads : 0;
 const roas = 3.4;
 ---
 

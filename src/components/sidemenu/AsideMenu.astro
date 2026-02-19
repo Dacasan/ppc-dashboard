@@ -1,10 +1,10 @@
 ---
 import SideMenuItem from './SideMenuItem.astro';
 import SideMenuCard from './SideMenuCard.astro';
-import { getUniqueBrands } from '../../lib/api';
+import { actions } from 'astro:actions';
 
 // Fetch de datos en el servidor (Build time o Request time)
-const brands = await getUniqueBrands();
+const { data: brands } = await Astro.callAction(actions.getUniqueBrands, undefined);
 ---
 
 <nav class="flex flex-col flex-1 gap-2 min-h-0">
@@ -24,7 +24,7 @@ const brands = await getUniqueBrands();
         <div class="flex flex-col gap-2 px-1">
             <div class="flex items-center justify-between px-2 mb-1">
                 <h2 class="font-bold text-xs text-zinc-400 uppercase tracking-widest">
-                    Tus Marcas ({brands.length})
+                    Tus Marcas ({(brands ?? []).length})
                 </h2>
                 <button class="text-zinc-400 hover:text-zinc-600 transition text-xs">
                     <i class="fa-solid fa-filter"></i>
@@ -32,8 +32,8 @@ const brands = await getUniqueBrands();
             </div>
 
             <div class="flex flex-col gap-2 pb-10">
-                {brands.length > 0 ? (
-                    brands.map(brand => (
+                {(brands ?? []).length > 0 ? (
+                    (brands ?? []).map(brand => (
                         <SideMenuCard brand={brand} />
                     ))
                 ) : (
