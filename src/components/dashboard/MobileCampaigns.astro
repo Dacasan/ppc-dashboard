@@ -10,6 +10,12 @@ interface Props {
 const { year = "2026", month = 1 } = Astro.props;
 const { data: campaignsData } = await Astro.callAction(actions.getAllCampaigns, { year, month });
 const campaigns = campaignsData ?? [];
+
+function toSlug(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+const MONTH_NAMES = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 ---
 
 <!-- Mobile campaigns section (visible only below xl) -->
@@ -25,19 +31,22 @@ const campaigns = campaignsData ?? [];
       const channel = getChannelInfo(camp.campaign_name || '');
       const channelLetter = channel.name === 'Google Ads' ? 'G' : channel.name === 'Meta Ads' ? 'M' : channel.name === 'TikTok' ? 'T' : '?';
       const channelBg = channel.name === 'Google Ads' ? 'bg-blue-500' : channel.name === 'Meta Ads' ? 'bg-sky-500' : channel.name === 'TikTok' ? 'bg-zinc-800' : 'bg-zinc-400';
+      const brandSlug = toSlug(camp.brand || camp.nombre_cuenta || '');
+      const monthLabel = `${MONTH_NAMES[camp.month_num] || ''} ${camp.year || year}`;
 
       return (
-        <div class="p-3 rounded-xl border border-zinc-200 bg-white">
+        <a href={`/${brandSlug}/campaigns/${camp.id}`} class="block p-3 rounded-xl border border-zinc-200 bg-white hover:border-blue-300 hover:shadow-sm transition-all group">
           <div class="flex items-start gap-2.5 mb-2">
             <div class={`w-7 h-7 rounded-lg ${channelBg} text-white flex items-center justify-center text-xs font-bold shrink-0`}>
               {channelLetter}
             </div>
             <div class="min-w-0 flex-1">
-              <p class="font-semibold text-sm text-zinc-800 truncate">{camp.campaign_name}</p>
-              <p class="text-[11px] text-zinc-400">{camp.brand || camp.nombre_cuenta} · Ene 2026</p>
+              <p class="font-semibold text-sm text-zinc-800 truncate group-hover:text-blue-600 transition-colors">{camp.campaign_name}</p>
+              <p class="text-[11px] text-zinc-400">{camp.brand || camp.nombre_cuenta} · {monthLabel}</p>
             </div>
+            <i class="fa-solid fa-chevron-right text-[10px] text-zinc-300 group-hover:text-blue-400 mt-1.5 transition-colors"></i>
           </div>
-          <div class="grid grid-cols-3 gap-2 mb-2">
+          <div class="grid grid-cols-3 gap-2">
             <div class="text-center">
               <p class="text-[10px] text-zinc-400 uppercase">Gasto</p>
               <p class="text-xs font-bold text-zinc-700">{formatMoney(camp.cost_total_mes)}</p>
@@ -51,15 +60,7 @@ const campaigns = campaignsData ?? [];
               <p class="text-xs font-bold text-zinc-700">{formatMoney(cpl)}</p>
             </div>
           </div>
-          <div class="flex items-center gap-1.5">
-            <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-600 border border-blue-100">
-              CTR {(Math.random() * 3 + 1).toFixed(1)}%
-            </span>
-            <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-600 border border-emerald-100">
-              Activa
-            </span>
-          </div>
-        </div>
+        </a>
       );
     })}
   </div>

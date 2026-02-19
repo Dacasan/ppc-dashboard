@@ -6,7 +6,14 @@ import { pb as adminPb } from './lib/pb';
 const PUBLIC_ROUTES = ['/login', '/auth/callback', '/auth/logout', '/api/login'];
 
 // Routes allowed for marketing users (everything else requires admin)
-const MARKETING_ALLOWED = ['/leads', '/profile', '/auth/logout', '/api/change-password', '/api/request-recovery'];
+const MARKETING_ALLOWED = ['/leads', '/debug-leads', '/profile', '/auth/logout', '/api/change-password', '/api/request-recovery'];
+
+// --- CSRF Origin Check ---
+// Astro's built-in checkOrigin doesn't work behind CapRover/Nginx because
+// the proxy rewrites the request URL (internal origin ≠ browser Origin).
+// We implement our own check using the known site URL instead.
+const SITE_ORIGIN = import.meta.env.SITE ? new URL(import.meta.env.SITE).origin : '';
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 // --- Rate limiting (in-memory, per-process) ---
 const loginAttempts = new Map<string, { count: number; lastAttempt: number; blockedUntil: number }>();
@@ -69,6 +76,14 @@ export function recordLoginAttempt(ip: string, success: boolean) {
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url;
+
+  // CSRF: For mutating requests, verify Origin matches our site
+  if (!SAFE_METHODS.has(context.request.method)) {
+    const origin = context.request.headers.get('origin');
+    if (origin && SITE_ORIGIN && origin !== SITE_ORIGIN) {
+      return new Response('Forbidden – origin mismatch', { status: 403 });
+    }
+  }
 
   // Allow static assets and public routes
   if (
