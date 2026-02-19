@@ -22,9 +22,10 @@ const MONTH_NAMES = [
   '', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
-const { data: statsData } = await Astro.callAction(actions.getGlobalStats, { year, month });
-const activeBrands = statsData?.activeBrands ?? 0;
+const { data: globalRecord } = await Astro.callAction(actions.getGlobalStats, { year, month });
+const { data: brandsRanking } = await Astro.callAction(actions.getBrandsRanking, { year, month });
 const { data: campaigns } = await Astro.callAction(actions.getAllCampaigns, { year, month });
+const activeBrands = brandsRanking?.length ?? 0;
 ---
 
 <DashboardLayout title="Resumen Global | A1 Marketing">

@@ -8,10 +8,11 @@ interface Props {
 }
 
 const { year = "2026", month = 1 } = Astro.props;
-const { data: statsData } = await Astro.callAction(actions.getGlobalStats, { year, month });
-const totalSpend = statsData?.totalSpend ?? 0;
-const totalLeads = statsData?.totalLeads ?? 0;
-const avgCPL = statsData?.avgCPL ?? 0;
+// Fetch del registro GLOBAL pre-calculado (una sola fila)
+const { data: global } = await Astro.callAction(actions.getGlobalStats, { year, month });
+const totalSpend = global?.cost_total_mes ?? 0;
+const totalLeads = global?.leads_total_mes ?? 0;
+const avgCPL = totalLeads > 0 ? totalSpend / totalLeads : 0;
 const roas = 3.4;
 ---
 

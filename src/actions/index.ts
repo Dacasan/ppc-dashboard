@@ -12,18 +12,21 @@ export type BrandOption = {
 };
 
 // --- Actions ---
+// Zero Client-Side Math: el backend pre-calcula TODO.
+// El frontend solo lee y muestra.
 
 export const server = {
-  // Obtener marcas unicas desde PocketBase
+  // Obtener marcas unicas (excluye GLOBAL)
   getUniqueBrands: defineAction({
     handler: async () => {
-      const records = await pb.collection('campaign_reports').getList(1, 500, {
-        sort: '-created',
+      const records = await pb.collection('campaign_reports').getFullList<CampaignReport>({
+        filter: `tipo_registro = "Marca" && brand != "GLOBAL"`,
         fields: 'brand, nombre_cuenta',
+        sort: 'brand',
       });
 
       const uniqueNames = [...new Set(
-        records.items.map(r => r.brand || r.nombre_cuenta || 'Desconocido')
+        records.map(r => r.brand || r.nombre_cuenta || 'Desconocido')
       )];
 
       return uniqueNames.map(name => ({
@@ -34,7 +37,7 @@ export const server = {
     },
   }),
 
-  // Estadisticas globales del dashboard (mes)
+  // Estadisticas globales (mes) → UNA sola fila GLOBAL pre-calculada
   getGlobalStats: defineAction({
     input: z.object({
       year: z.string(),
@@ -42,27 +45,16 @@ export const server = {
     }),
     handler: async ({ year, month }) => {
       const records = await pb.collection('campaign_reports').getFullList<CampaignReport>({
-        filter: `year = "${year}" && month_num = ${month} && tipo_registro = "Marca"`,
+        filter: `year = "${year}" && month_num = ${month} && tipo_registro = "Marca" && brand = "GLOBAL"`,
+        requestKey: `global-stats-${year}-${month}`,
       });
 
-      let totalSpend = 0;
-      let totalLeads = 0;
-
-      records.forEach(r => {
-        totalSpend += r.cost_total_mes || 0;
-        totalLeads += r.leads_total_mes || 0;
-      });
-
-      return {
-        totalSpend,
-        totalLeads,
-        avgCPL: totalLeads > 0 ? totalSpend / totalLeads : 0,
-        activeBrands: records.length,
-      };
+      // Retorna el registro GLOBAL directamente (una sola fila)
+      return records[0] || null;
     },
   }),
 
-  // Ranking de marcas por gasto (mes)
+  // Ranking de marcas por gasto (mes) - excluye GLOBAL
   getBrandsRanking: defineAction({
     input: z.object({
       year: z.string(),
@@ -70,7 +62,7 @@ export const server = {
     }),
     handler: async ({ year, month }) => {
       return await pb.collection('campaign_reports').getFullList<CampaignReport>({
-        filter: `year = "${year}" && month_num = ${month} && tipo_registro = "Marca"`,
+        filter: `year = "${year}" && month_num = ${month} && tipo_registro = "Marca" && brand != "GLOBAL"`,
         sort: '-cost_total_mes',
       });
     },
@@ -90,48 +82,21 @@ export const server = {
     },
   }),
 
-  // Estadisticas anuales globales
+  // Estadisticas anuales globales → filas GLOBAL mensuales pre-calculadas
   getGlobalYearStats: defineAction({
     input: z.object({
       year: z.string(),
     }),
     handler: async ({ year }) => {
-      const records = await pb.collection('campaign_reports').getFullList<CampaignReport>({
-        filter: `year = "${year}" && tipo_registro = "Marca"`,
+      // Cada mes tiene su propia fila GLOBAL ya pre-calculada
+      return await pb.collection('campaign_reports').getFullList<CampaignReport>({
+        filter: `year = "${year}" && tipo_registro = "Marca" && brand = "GLOBAL"`,
+        sort: 'month_num',
       });
-
-      let totalSpend = 0;
-      let totalLeads = 0;
-      records.forEach(r => {
-        totalSpend += r.cost_total_mes || 0;
-        totalLeads += r.leads_total_mes || 0;
-      });
-
-      const monthMap = new Map<number, { spend: number; leads: number }>();
-      records.forEach(r => {
-        const m = r.month_num;
-        const prev = monthMap.get(m) || { spend: 0, leads: 0 };
-        monthMap.set(m, {
-          spend: prev.spend + (r.cost_total_mes || 0),
-          leads: prev.leads + (r.leads_total_mes || 0),
-        });
-      });
-
-      const months = Array.from(monthMap.entries())
-        .sort((a, b) => a[0] - b[0])
-        .map(([month_num, data]) => ({ month_num, ...data }));
-
-      return {
-        totalSpend,
-        totalLeads,
-        avgCPL: totalLeads > 0 ? totalSpend / totalLeads : 0,
-        activeBrands: new Set(records.map(r => r.brand || r.nombre_cuenta)).size,
-        months,
-      };
     },
   }),
 
-  // Datos completos de una marca (mes)
+  // Datos completos de una marca (mes): registro Marca + sus Campanas
   getBrandFullData: defineAction({
     input: z.object({
       brandName: z.string(),
@@ -140,7 +105,7 @@ export const server = {
     }),
     handler: async ({ brandName, year, month }) => {
       const records = await pb.collection('campaign_reports').getFullList<CampaignReport>({
-        filter: `(brand ~ "${brandName}" || nombre_cuenta ~ "${brandName}") && year = "${year}" && month_num = ${month}`,
+        filter: `brand = "${brandName}" && year = "${year}" && month_num = ${month}`,
         sort: '-cost_total_mes',
       });
 
@@ -151,35 +116,20 @@ export const server = {
     },
   }),
 
-  // Datos anuales de una marca
+  // Datos anuales de una marca → filas mensuales pre-calculadas
   getBrandYearData: defineAction({
     input: z.object({
       brandName: z.string(),
       year: z.string(),
     }),
     handler: async ({ brandName, year }) => {
-      const records = await pb.collection('campaign_reports').getFullList<CampaignReport>({
-        filter: `(brand ~ "${brandName}" || nombre_cuenta ~ "${brandName}") && year = "${year}"`,
+      // Las filas Marca mensuales ya tienen los totales pre-calculados
+      const monthlyReports = await pb.collection('campaign_reports').getFullList<CampaignReport>({
+        filter: `brand = "${brandName}" && year = "${year}" && tipo_registro = "Marca"`,
         sort: 'month_num',
       });
 
-      const brandRecords = records.filter(r => r.tipo_registro === 'Marca');
-      const campaignRecords = records.filter(r => r.tipo_registro === 'Campaña');
-
-      let totalSpend = 0;
-      let totalLeads = 0;
-      brandRecords.forEach(r => {
-        totalSpend += r.cost_total_mes || 0;
-        totalLeads += r.leads_total_mes || 0;
-      });
-
-      return {
-        totalSpend,
-        totalLeads,
-        avgCPL: totalLeads > 0 ? totalSpend / totalLeads : 0,
-        monthlyReports: brandRecords,
-        campaigns: campaignRecords,
-      };
+      return monthlyReports;
     },
   }),
 };

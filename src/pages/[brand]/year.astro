@@ -16,11 +16,18 @@ if (!currentBrand) return Astro.redirect('/');
 const url = Astro.url;
 const year = url.searchParams.get('year') || '2026';
 
-const { data: yearData } = await Astro.callAction(actions.getBrandYearData, { brandName: currentBrand.name, year });
-const totalSpend = yearData?.totalSpend ?? 0;
-const totalLeads = yearData?.totalLeads ?? 0;
-const avgCPL = yearData?.avgCPL ?? 0;
-const monthlyReports = yearData?.monthlyReports ?? [];
+// Filas mensuales pre-calculadas por el backend (cada fila es un CampaignReport de tipo "Marca")
+const { data: reportsData } = await Astro.callAction(actions.getBrandYearData, { brandName: currentBrand.name, year });
+const reports = reportsData ?? [];
+
+// Totales anuales: sumamos las métricas pre-calculadas de cada mes
+let totalSpend = 0;
+let totalLeads = 0;
+reports.forEach(r => {
+  totalSpend += r.cost_total_mes || 0;
+  totalLeads += r.leads_total_mes || 0;
+});
+const avgCPL = totalLeads > 0 ? totalSpend / totalLeads : 0;
 
 const MONTH_NAMES: Record<number, string> = {
   1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
@@ -97,11 +104,11 @@ const MONTH_NAMES: Record<number, string> = {
         </div>
 
         <!-- Monthly breakdown table -->
-        {monthlyReports.length > 0 ? (
+        {reports.length > 0 ? (
             <div class="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
                 <div class="px-5 py-4 border-b border-zinc-100 bg-zinc-50 flex justify-between items-center">
                     <h3 class="font-bold text-sm text-zinc-700">Desglose Mensual {year}</h3>
-                    <span class="text-xs text-zinc-400">{monthlyReports.length} meses con datos</span>
+                    <span class="text-xs text-zinc-400">{reports.length} meses con datos</span>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm whitespace-nowrap">
@@ -115,7 +122,7 @@ const MONTH_NAMES: Record<number, string> = {
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-zinc-100">
-                            {monthlyReports.map((row) => {
+                            {reports.map((row) => {
                                 const cpl = row.leads_total_mes > 0 ? row.cost_total_mes / row.leads_total_mes : 0;
                                 const mesNombre = MONTH_NAMES[row.month_num] || `Mes ${row.month_num}`;
                                 return (

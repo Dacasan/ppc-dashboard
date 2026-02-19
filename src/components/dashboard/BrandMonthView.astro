@@ -8,16 +8,17 @@ interface Props {
 
 const { report } = Astro.props;
 
-// Periodos de 5 días
+// Periodos de 5 días - labels pre-generados por el backend
 const periods = [
-  { label: 'Ene 1-5',   spend: report.cost_01_05, leads: report.leads_01_05 },
-  { label: 'Ene 6-10',  spend: report.cost_06_10, leads: report.leads_06_10 },
-  { label: 'Ene 11-15', spend: report.cost_11_15, leads: report.leads_11_15 },
-  { label: 'Ene 16-20', spend: report.cost_16_20, leads: report.leads_16_20 },
-  { label: 'Ene 21-25', spend: report.cost_21_25, leads: report.leads_21_25 },
-  { label: 'Ene 26-31', spend: report.cost_26_31, leads: report.leads_26_31 },
+  { label: report.semana_01_05 || '1-5',   spend: report.cost_01_05, leads: report.leads_01_05 },
+  { label: report.semana_06_10 || '6-10',  spend: report.cost_06_10, leads: report.leads_06_10 },
+  { label: report.semana_11_15 || '11-15', spend: report.cost_11_15, leads: report.leads_11_15 },
+  { label: report.semana_16_20 || '16-20', spend: report.cost_16_20, leads: report.leads_16_20 },
+  { label: report.semana_21_25 || '21-25', spend: report.cost_21_25, leads: report.leads_21_25 },
+  { label: report.semana_26_31 || '26-31', spend: report.cost_26_31, leads: report.leads_26_31 },
 ];
 
+// Métricas pre-calculadas por el backend
 const totalSpend = report.cost_total_mes;
 const totalLeads = report.leads_total_mes;
 const avgCPL = totalLeads > 0 ? totalSpend / totalLeads : 0;
