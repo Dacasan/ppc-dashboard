@@ -7,9 +7,14 @@ interface Props {
   month?: number;
 }
 
-const { year = "2026", month = 1 } = Astro.props;
+const now = new Date();
+const { year = String(now.getFullYear()), month = now.getMonth() + 1 } = Astro.props;
 const { data: campaignsData } = await Astro.callAction(actions.getAllCampaigns, { year, month });
 const campaigns = campaignsData ?? [];
+const { data: brandsData } = await Astro.callAction(actions.getUniqueBrands, undefined);
+const brandSlugMap = new Map((brandsData ?? []).map(b => [b.name, b.slug]));
+
+const MONTH_NAMES_SHORT = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 ---
 
 <aside class="hidden xl:flex flex-col w-[320px] shrink-0 bg-white border-l border-zinc-200 h-full overflow-hidden">
@@ -26,8 +31,10 @@ const campaigns = campaignsData ?? [];
       const channelLetter = channel.name === 'Google Ads' ? 'G' : channel.name === 'Meta Ads' ? 'M' : channel.name === 'TikTok' ? 'T' : '?';
       const channelBg = channel.name === 'Google Ads' ? 'bg-blue-500' : channel.name === 'Meta Ads' ? 'bg-sky-500' : channel.name === 'TikTok' ? 'bg-zinc-800' : 'bg-zinc-400';
 
+      const slug = brandSlugMap.get(camp.brand) || brandSlugMap.get(camp.nombre_cuenta) || '';
+
       return (
-        <div class="p-3 rounded-xl border border-zinc-200 hover:border-zinc-300 hover:shadow-sm bg-white transition-all">
+        <a href={slug ? `/${slug}/campaigns/${camp.id}` : '#'} class="block p-3 rounded-xl border border-zinc-200 hover:border-zinc-300 hover:shadow-sm bg-white transition-all">
 
           <!-- Campaign header -->
           <div class="flex items-start gap-2.5 mb-2.5">
@@ -38,8 +45,8 @@ const campaigns = campaignsData ?? [];
               <p class="font-semibold text-sm text-zinc-800 truncate leading-tight">{camp.campaign_name}</p>
               <div class="flex items-center gap-1.5 mt-0.5">
                 <span class="text-[11px] text-zinc-400">{camp.brand || camp.nombre_cuenta}</span>
-                <span class="text-zinc-300">·</span>
-                <span class="text-[11px] text-zinc-400">Ene 2026</span>
+                <span class="text-zinc-300">&middot;</span>
+                <span class="text-[11px] text-zinc-400">{MONTH_NAMES_SHORT[month]} {year}</span>
               </div>
             </div>
           </div>
@@ -72,7 +79,7 @@ const campaigns = campaignsData ?? [];
               Activa
             </span>
           </div>
-        </div>
+        </a>
       );
     })}
   </div>

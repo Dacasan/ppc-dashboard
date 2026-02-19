@@ -40,7 +40,7 @@ const maxLeads = Math.max(...brandsData.map(b => b.leads), 1);
 
       const isGood = brand.cpl < 800;
       const isMedium = brand.cpl >= 800 && brand.cpl < 1200;
-      const cplBarColor = isGood ? 'bg-emerald-500' : isMedium ? 'bg-amber-500' : 'bg-rose-500';
+      const cplBarColor = isGood ? 'bg-emerald-500' : isMedium ? 'bg-amber-500' : 'bg-orange-500';
 
       return (
         <div class="flex items-center gap-3" data-brand-row={i}>

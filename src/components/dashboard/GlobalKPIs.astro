@@ -8,10 +8,14 @@ interface Props {
 }
 
 const { year = "2026", month = 1 } = Astro.props;
-// Fetch del registro GLOBAL pre-calculado (una sola fila)
-const { data: global } = await Astro.callAction(actions.getGlobalStats, { year, month });
-const totalSpend = global?.cost_total_mes ?? 0;
-const totalLeads = global?.leads_total_mes ?? 0;
+// Sumar marcas individuales (sin GLOBAL) para KPIs reales
+const { data: brands } = await Astro.callAction(actions.getBrandsRanking, { year, month });
+let totalSpend = 0;
+let totalLeads = 0;
+(brands ?? []).forEach(b => {
+  totalSpend += b.cost_total_mes || 0;
+  totalLeads += b.leads_total_mes || 0;
+});
 const avgCPL = totalLeads > 0 ? totalSpend / totalLeads : 0;
 const roas = 3.4;
 ---
@@ -55,7 +59,7 @@ const roas = 3.4;
             <span class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">CPL Promedio</span>
         </div>
         <span class="text-2xl font-black text-zinc-900 tracking-tight">{formatMoney(avgCPL)}</span>
-        <div class="text-[11px] font-medium text-rose-500 flex items-center gap-1">
+        <div class="text-[11px] font-medium text-amber-600 flex items-center gap-1">
             <i class="fa-solid fa-arrow-up text-[9px]"></i> 3.1% vs mes ant.
         </div>
     </div>

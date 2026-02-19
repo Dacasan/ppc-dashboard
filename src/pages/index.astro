@@ -11,24 +11,36 @@ import MobileCampaigns from '../components/dashboard/MobileCampaigns.astro';
 import Skeleton from '../components/ui/Skeleton.astro';
 import { actions } from 'astro:actions';
 
-// Read month/year from URL params, defaulting to January 2026
+// Read month/year from URL params
 const url = Astro.url;
-const monthParam = parseInt(url.searchParams.get('month') || '1');
-const yearParam = url.searchParams.get('year') || '2026';
-const month = isNaN(monthParam) || monthParam < 1 || monthParam > 12 ? 1 : monthParam;
+const now = new Date();
+const defaultMonth = now.getMonth() + 1;
+const defaultYear = String(now.getFullYear());
+const monthParam = parseInt(url.searchParams.get('month') || String(defaultMonth));
+const yearParam = url.searchParams.get('year') || defaultYear;
+const month = isNaN(monthParam) || monthParam < 1 || monthParam > 12 ? defaultMonth : monthParam;
 const year = yearParam;
 
 const MONTH_NAMES = [
   '', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
-const { data: globalRecord } = await Astro.callAction(actions.getGlobalStats, { year, month });
+
+// Build month/year options from most recent to oldest (2023+)
+const AVAILABLE_YEARS = [2026, 2025, 2024, 2023];
+const monthYearOptions: { month: number; year: number; label: string }[] = [];
+for (const y of AVAILABLE_YEARS) {
+  const maxM = y === now.getFullYear() ? now.getMonth() + 1 : 12;
+  for (let m = maxM; m >= 1; m--) {
+    monthYearOptions.push({ month: m, year: y, label: `${MONTH_NAMES[m]} ${y}` });
+  }
+}
 const { data: brandsRanking } = await Astro.callAction(actions.getBrandsRanking, { year, month });
 const { data: campaigns } = await Astro.callAction(actions.getAllCampaigns, { year, month });
 const activeBrands = brandsRanking?.length ?? 0;
 ---
 
-<DashboardLayout title="Resumen Global | A1 Marketing">
+<DashboardLayout title="Resumen General | A1 Marketing">
 
     <!-- Left sidebar (desktop only) -->
     <BrandsSidebar slot="left-sidebar" year={year} month={month} server:defer>
@@ -45,7 +57,7 @@ const activeBrands = brandsRanking?.length ?? 0;
     </CampaignsSidebar>
 
     <!-- Mobile sidebar content -->
-    <MobileSidebarContent slot="mobile-sidebar" server:defer>
+    <MobileSidebarContent slot="mobile-sidebar" year={year} month={month} server:defer>
         <div slot="fallback" class="p-4"><Skeleton class="h-12 w-full mb-2" /><Skeleton class="h-12 w-full mb-2" /><Skeleton class="h-12 w-full" /></div>
     </MobileSidebarContent>
 
@@ -56,22 +68,26 @@ const activeBrands = brandsRanking?.length ?? 0;
         <div>
             <div class="flex items-center gap-3 flex-wrap">
                 <h1 class="text-2xl md:text-3xl font-black text-zinc-900 tracking-tight">
-                    Resumen Global
+                    Resumen General
                 </h1>
                 <span class="text-zinc-300 font-light text-2xl md:text-3xl">—</span>
-                <!-- Month dropdown selector -->
+                <!-- Month/Year combined dropdown -->
                 <div class="relative">
                     <select
-                        id="month-selector"
-                        class="appearance-none text-2xl md:text-3xl font-black text-blue-600 bg-transparent border-none cursor-pointer pr-8 focus:outline-none hover:text-blue-700 transition-colors"
+                        id="month-year-selector"
+                        class="appearance-none text-xl md:text-2xl font-black text-blue-600 bg-transparent border-none cursor-pointer pr-8 focus:outline-none hover:text-blue-700 transition-colors"
                     >
-                        {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => (
-                            <option value={m} selected={m === month}>{MONTH_NAMES[m]}</option>
+                        {monthYearOptions.map(opt => (
+                            <option
+                                value={`${opt.month}-${opt.year}`}
+                                selected={opt.month === month && String(opt.year) === year}
+                            >
+                                {opt.label}
+                            </option>
                         ))}
                     </select>
                     <i class="fa-solid fa-chevron-down absolute right-1 top-1/2 -translate-y-1/2 text-blue-500 text-sm pointer-events-none"></i>
                 </div>
-                <span class="text-2xl md:text-3xl font-black text-zinc-500">{year}</span>
             </div>
             <p class="text-zinc-400 text-xs mt-1 font-medium">
                 {activeBrands} marcas · {campaigns?.length ?? 0} campañas activas
@@ -140,16 +156,18 @@ const activeBrands = brandsRanking?.length ?? 0;
 </DashboardLayout>
 
 <script>
-    function initMonthSelector() {
-        const sel = document.getElementById('month-selector') as HTMLSelectElement | null;
+    function initMonthYearSelector() {
+        const sel = document.getElementById('month-year-selector') as HTMLSelectElement | null;
         if (!sel) return;
         sel.addEventListener('change', () => {
+            const [m, y] = sel.value.split('-');
             const url = new URL(window.location.href);
-            url.searchParams.set('month', sel.value);
+            url.searchParams.set('month', m);
+            url.searchParams.set('year', y);
             window.location.href = url.toString();
         });
     }
 
-    initMonthSelector();
-    document.addEventListener('astro:after-swap', initMonthSelector);
+    initMonthYearSelector();
+    document.addEventListener('astro:after-swap', initMonthYearSelector);
 </script>

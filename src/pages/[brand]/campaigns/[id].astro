@@ -1,0 +1,213 @@
+---
+import DashboardLayout from '../../../layouts/DashboardLayout.astro';
+import BrandsSidebar from '../../../components/dashboard/BrandsSidebar.astro';
+import MobileSidebarContent from '../../../components/dashboard/MobileSidebarContent.astro';
+import Skeleton from '../../../components/ui/Skeleton.astro';
+import { actions } from 'astro:actions';
+import { formatMoney, formatNumber, getCplColor, getChannelInfo } from '../../../lib/format';
+
+export const prerender = false;
+const { brand, id } = Astro.params;
+
+// Validate brand
+const { data: brands } = await Astro.callAction(actions.getUniqueBrands, undefined);
+const currentBrand = brands?.find(b => b.slug === brand);
+if (!currentBrand) return Astro.redirect('/');
+
+// Get campaign data
+const { data: campaign } = await Astro.callAction(actions.getCampaignById, { id: id! });
+if (!campaign || campaign.brand !== currentBrand.name) return Astro.redirect(`/${currentBrand.slug}`);
+
+const year = campaign.year || String(new Date().getFullYear());
+const month = campaign.month_num || (new Date().getMonth() + 1);
+
+// Get historical data for this campaign
+const { data: historyData } = await Astro.callAction(actions.getCampaignHistory, {
+  campaignName: campaign.campaign_name,
+  brandName: currentBrand.name,
+  year,
+});
+const history = historyData ?? [];
+
+const cpl = campaign.leads_total_mes > 0 ? campaign.cost_total_mes / campaign.leads_total_mes : 0;
+const channel = getChannelInfo(campaign.campaign_name || '');
+
+const MONTH_NAMES: Record<number, string> = {
+  1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
+  5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto',
+  9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
+};
+
+// Period breakdown
+const periods = [
+  { label: campaign.semana_01_05 || '1-5',   spend: campaign.cost_01_05, leads: campaign.leads_01_05 },
+  { label: campaign.semana_06_10 || '6-10',  spend: campaign.cost_06_10, leads: campaign.leads_06_10 },
+  { label: campaign.semana_11_15 || '11-15', spend: campaign.cost_11_15, leads: campaign.leads_11_15 },
+  { label: campaign.semana_16_20 || '16-20', spend: campaign.cost_16_20, leads: campaign.leads_16_20 },
+  { label: campaign.semana_21_25 || '21-25', spend: campaign.cost_21_25, leads: campaign.leads_21_25 },
+  { label: campaign.semana_26_31 || '26-31', spend: campaign.cost_26_31, leads: campaign.leads_26_31 },
+];
+---
+
+<DashboardLayout title={`${campaign.campaign_name} | ${currentBrand.name}`}>
+
+    <!-- Left sidebar -->
+    <BrandsSidebar slot="left-sidebar" year={year} month={month} server:defer>
+        <aside slot="fallback" class="hidden lg:block w-[280px] shrink-0 bg-white border-r border-zinc-200">
+            <div class="p-4"><Skeleton class="h-6 w-20 mb-4" /><Skeleton class="h-20 w-full mb-2" /><Skeleton class="h-20 w-full" /></div>
+        </aside>
+    </BrandsSidebar>
+
+    <!-- Mobile sidebar -->
+    <MobileSidebarContent slot="mobile-sidebar" year={year} month={month} server:defer>
+        <div slot="fallback" class="p-4"><Skeleton class="h-12 w-full mb-2" /><Skeleton class="h-12 w-full" /></div>
+    </MobileSidebarContent>
+
+    <!-- Center content -->
+    <div class="flex flex-col gap-6">
+
+        <!-- Header -->
+        <header class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-4">
+                <div class={`w-12 h-12 rounded-xl flex items-center justify-center text-white text-lg font-bold shadow-sm ${
+                    channel.name === 'Google Ads' ? 'bg-blue-500' : channel.name === 'Meta Ads' ? 'bg-sky-500' : channel.name === 'TikTok' ? 'bg-zinc-800' : 'bg-zinc-400'
+                }`}>
+                    <i class={`fa-brands ${channel.icon}`}></i>
+                </div>
+                <div>
+                    <h1 class="text-lg md:text-xl font-bold text-zinc-900 leading-tight max-w-md">{campaign.campaign_name}</h1>
+                    <div class="flex items-center gap-2 mt-1 text-xs text-zinc-400">
+                        <span class={`px-2 py-0.5 rounded text-[10px] font-semibold ${channel.color} border`}>{channel.name}</span>
+                        <span>{currentBrand.name}</span>
+                        <span class="text-zinc-300">&middot;</span>
+                        <span>{MONTH_NAMES[month]} {year}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href={`/${currentBrand.slug}?month=${month}&year=${year}`} class="inline-flex items-center gap-2 text-xs font-medium px-3 py-2 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50 transition">
+                    <i class="fa-solid fa-arrow-left"></i> <span class="hidden sm:inline">Ver marca</span>
+                </a>
+            </div>
+        </header>
+
+        <!-- KPI cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm flex flex-col gap-1">
+                <div class="flex items-center gap-2 mb-1">
+                    <div class="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
+                        <i class="fa-solid fa-wallet text-blue-500 text-xs"></i>
+                    </div>
+                    <span class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Gasto</span>
+                </div>
+                <span class="text-2xl font-black text-zinc-900 tracking-tight">{formatMoney(campaign.cost_total_mes)}</span>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm flex flex-col gap-1">
+                <div class="flex items-center gap-2 mb-1">
+                    <div class="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
+                        <i class="fa-solid fa-users text-emerald-500 text-xs"></i>
+                    </div>
+                    <span class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Leads</span>
+                </div>
+                <span class="text-2xl font-black text-zinc-900 tracking-tight">{formatNumber(campaign.leads_total_mes)}</span>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm flex flex-col gap-1">
+                <div class="flex items-center gap-2 mb-1">
+                    <div class="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center">
+                        <i class="fa-solid fa-chart-line text-amber-500 text-xs"></i>
+                    </div>
+                    <span class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">CPL</span>
+                </div>
+                <span class="text-2xl font-black text-zinc-900 tracking-tight">
+                    <span class={`px-2 py-0.5 rounded border text-lg ${getCplColor(cpl)}`}>{formatMoney(cpl)}</span>
+                </span>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm flex flex-col gap-1">
+                <div class="flex items-center gap-2 mb-1">
+                    <div class="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
+                        <i class="fa-solid fa-arrow-pointer text-blue-500 text-xs"></i>
+                    </div>
+                    <span class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">CTR</span>
+                </div>
+                <span class="text-2xl font-black text-zinc-900 tracking-tight">—</span>
+                <span class="text-[10px] text-zinc-400">No disponible</span>
+            </div>
+        </div>
+
+        <!-- Period breakdown -->
+        <div class="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
+            <div class="px-5 py-4 border-b border-zinc-100 bg-zinc-50 flex justify-between items-center">
+                <h3 class="font-bold text-sm text-zinc-700">Rendimiento por Periodos</h3>
+                <span class="text-xs text-zinc-400">{MONTH_NAMES[month]} {year}</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm whitespace-nowrap">
+                    <thead class="bg-zinc-50 text-zinc-400 text-[10px] uppercase font-bold border-b border-zinc-100">
+                        <tr>
+                            <th class="px-6 py-3 text-left">Periodo</th>
+                            <th class="px-6 py-3 text-right">Gasto</th>
+                            <th class="px-6 py-3 text-right">Leads</th>
+                            <th class="px-6 py-3 text-right">CPL</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-100">
+                        {periods.map((row) => {
+                            const periodCpl = row.leads > 0 ? row.spend / row.leads : 0;
+                            return (
+                                <tr class="hover:bg-zinc-50/50 transition-colors">
+                                    <td class="px-6 py-3 font-medium text-zinc-700">{row.label}</td>
+                                    <td class="px-6 py-3 text-right font-mono text-zinc-600">{formatMoney(row.spend)}</td>
+                                    <td class="px-6 py-3 text-right font-bold text-zinc-900">{row.leads}</td>
+                                    <td class="px-6 py-3 text-right font-mono text-xs">
+                                        <span class={`px-2 py-1 rounded border ${getCplColor(periodCpl)}`}>
+                                            {formatMoney(periodCpl)}
+                                        </span>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- History table (monthly) -->
+        {history.length > 1 && (
+            <div class="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
+                <div class="px-5 py-4 border-b border-zinc-100 bg-zinc-50 flex justify-between items-center">
+                    <h3 class="font-bold text-sm text-zinc-700">Historial Mensual {year}</h3>
+                    <span class="text-xs text-zinc-400">{history.length} meses</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm whitespace-nowrap">
+                        <thead class="bg-zinc-50 text-zinc-400 text-[10px] uppercase font-bold border-b border-zinc-100">
+                            <tr>
+                                <th class="px-6 py-3 text-left">Mes</th>
+                                <th class="px-6 py-3 text-right">Gasto</th>
+                                <th class="px-6 py-3 text-right">Leads</th>
+                                <th class="px-6 py-3 text-right">CPL</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-zinc-100">
+                            {history.map((row) => {
+                                const histCpl = row.leads_total_mes > 0 ? row.cost_total_mes / row.leads_total_mes : 0;
+                                return (
+                                    <tr class="hover:bg-zinc-50/50 transition-colors">
+                                        <td class="px-6 py-3 font-semibold text-zinc-700">{MONTH_NAMES[row.month_num] || `Mes ${row.month_num}`}</td>
+                                        <td class="px-6 py-3 text-right font-mono text-zinc-600">{formatMoney(row.cost_total_mes)}</td>
+                                        <td class="px-6 py-3 text-right font-bold text-zinc-900">{row.leads_total_mes}</td>
+                                        <td class="px-6 py-3 text-right font-mono text-xs">
+                                            <span class={`px-2 py-1 rounded border ${getCplColor(histCpl)}`}>
+                                                {formatMoney(histCpl)}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        )}
+    </div>
+</DashboardLayout>

@@ -2,8 +2,15 @@
 import { actions } from 'astro:actions';
 import { formatMoney } from '../../lib/format';
 
+interface Props {
+  year?: string;
+  month?: number;
+}
+
+const now = new Date();
+const { year = String(now.getFullYear()), month = now.getMonth() + 1 } = Astro.props;
 const { data: brands } = await Astro.callAction(actions.getUniqueBrands, undefined);
-const { data: records } = await Astro.callAction(actions.getBrandsRanking, { year: "2026", month: 1 });
+const { data: records } = await Astro.callAction(actions.getBrandsRanking, { year, month });
 
 const brandDataMap = new Map(
   (records ?? []).map(r => [r.brand || r.nombre_cuenta, r])
@@ -19,7 +26,7 @@ const currentPath = Astro.url.pathname;
     currentPath === '/' ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50'
   ]}>
     <span class="text-xl">📊</span>
-    <span class="font-semibold text-sm">Dashboard Global</span>
+    <span class="font-semibold text-sm">Dashboard General</span>
   </a>
 
   <div class="h-px bg-zinc-200 my-1"></div>
@@ -51,8 +58,8 @@ const currentPath = Astro.url.pathname;
           </div>
         </a>
         <div class="flex rounded-md border border-zinc-200 overflow-hidden text-[10px]">
-          <a href={`/${brand.slug}`} class="flex-1 text-center py-0.5 bg-zinc-900 text-white font-medium">Mes</a>
-          <a href={`/${brand.slug}/year`} class="flex-1 text-center py-0.5 bg-white text-zinc-500 font-medium hover:bg-zinc-50">Año</a>
+          <a href={`/${brand.slug}?month=${month}&year=${year}`} class="flex-1 text-center py-0.5 bg-zinc-900 text-white font-medium">Mes</a>
+          <a href={`/${brand.slug}/year?year=${year}`} class="flex-1 text-center py-0.5 bg-white text-zinc-500 font-medium hover:bg-zinc-50">Año</a>
         </div>
       </div>
     );
