@@ -5,6 +5,9 @@ import { pb as adminPb } from './lib/pb';
 // Routes that don't require authentication
 const PUBLIC_ROUTES = ['/login', '/auth/callback', '/auth/logout', '/api/login'];
 
+// Routes allowed for marketing users (everything else requires admin)
+const MARKETING_ALLOWED = ['/leads', '/profile', '/auth/logout', '/api/change-password', '/api/request-recovery'];
+
 // --- Rate limiting (in-memory, per-process) ---
 const loginAttempts = new Map<string, { count: number; lastAttempt: number; blockedUntil: number }>();
 const MAX_ATTEMPTS = 5;
@@ -162,6 +165,15 @@ export const onRequest = defineMiddleware(async (context, next) => {
   } catch {
     context.cookies.delete('pb_auth', { path: '/' });
     return context.redirect('/login');
+  }
+
+  // Role-based access: marketing users can only access /leads and /profile
+  const userRole = context.locals.user?.role || 'marketing';
+  if (userRole !== 'admin') {
+    const allowed = MARKETING_ALLOWED.some(route => pathname === route || pathname.startsWith(route + '/'));
+    if (!allowed) {
+      return context.redirect('/leads');
+    }
   }
 
   return next();
