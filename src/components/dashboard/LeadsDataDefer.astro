@@ -59,13 +59,13 @@ let campanias: any[] = [];
 let campaignsError: string | null = null;
 
 try {
-    const result = await pb.collection('campaigns_reports').getFullList({
+    const result = await pb.collection('campaign_reports').getFullList({
         filter: `tipo_registro="Marca" && month_num=${month} && year="${year}"`
     });
     campanias = result;
 } catch (e: any) {
-    console.error('[LeadsDataDefer] Error en campaigns_reports:', e?.message || e);
-    campaignsError = e?.message || 'Error al conectar con campaigns_reports';
+    console.error('[LeadsDataDefer] Error en campaign_reports:', e?.message || e);
+    campaignsError = e?.message || 'Error al conectar con campaign_reports';
 }
 
 // --- B. LEADS (conteo real) ---
@@ -156,7 +156,7 @@ const hasData = marcasAgrupadas.length > 0;
                 <div class="flex items-center gap-2 bg-rose-50 border border-rose-100 rounded-lg px-4 py-2.5 text-left">
                     <i class="fa-solid fa-xmark text-rose-400 text-xs"></i>
                     <div class="flex-1 min-w-0">
-                        <span class="text-xs font-bold text-rose-700 block">campaigns_reports</span>
+                        <span class="text-xs font-bold text-rose-700 block">campaign_reports</span>
                         <span class="text-[11px] text-rose-400 truncate block">{campaignsError}</span>
                     </div>
                 </div>
@@ -182,7 +182,7 @@ const hasData = marcasAgrupadas.length > 0;
                     <i class="fa-solid fa-triangle-exclamation text-amber-500 text-sm"></i>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <span class="text-sm font-bold text-amber-800">campaigns_reports no disponible</span>
+                    <span class="text-sm font-bold text-amber-800">campaign_reports no disponible</span>
                     <span class="text-xs text-amber-600 block truncate">Los datos de gasto no se pudieron cargar. Leads siguen visibles. &mdash; {campaignsError}</span>
                 </div>
             </div>
