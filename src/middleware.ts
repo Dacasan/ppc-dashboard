@@ -3,7 +3,7 @@ import PocketBase from 'pocketbase';
 import { pb as adminPb } from './lib/pb';
 
 // Routes that don't require authentication
-const PUBLIC_ROUTES = ['/login', '/auth/callback', '/auth/logout', '/api/login'];
+const PUBLIC_ROUTES = ['/login', '/auth/callback', '/auth/logout', '/api/login', '/leads'];
 
 // Routes allowed for marketing users (everything else requires admin)
 const MARKETING_ALLOWED = ['/leads', '/debug-leads', '/profile', '/auth/logout', '/api/change-password', '/api/request-recovery'];

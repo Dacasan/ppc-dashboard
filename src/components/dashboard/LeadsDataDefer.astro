@@ -15,10 +15,6 @@ interface Props {
 
 const { month, year } = Astro.props;
 
-const user = Astro.locals.user || {};
-const userRole = user.role || 'marketing';
-const isAdmin = userRole === 'admin';
-
 const ENGLISH_MONTHS = [
     '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
@@ -227,7 +223,7 @@ const hasData = marcasAgrupadas.length > 0;
                                         {record.total_leads_mes} <i class="fa-solid fa-users text-blue-500 text-xs ml-1"></i>
                                     </span>
                                 </div>
-                                {isAdmin && !campaignsError && (
+                                {!campaignsError && (
                                     <>
                                         <div class="w-px h-8 bg-zinc-200 mx-2"></div>
                                         <div class="flex flex-col text-right">
@@ -254,15 +250,14 @@ const hasData = marcasAgrupadas.length > 0;
                                         <span class="text-3xl font-black text-zinc-900 tracking-tight leading-none mb-3">
                                             {leads} <span class="text-xs font-bold text-zinc-400 ml-0.5">L</span>
                                         </span>
-                                        {isAdmin && !campaignsError ? (
-                                            <div class="w-full bg-blue-50/50 border border-blue-100 px-3 py-1.5 rounded-lg text-sm font-bold text-blue-600">
+                                        {!campaignsError && (
+                                            <div class="w-full bg-blue-50/50 border border-blue-100 px-3 py-1.5 rounded-lg text-sm font-bold text-blue-600 mb-1.5">
                                                 {formatMoney(cost)}
                                             </div>
-                                        ) : (
-                                            <div class={`w-full border px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${badge.class}`}>
-                                                {badge.label}
-                                            </div>
                                         )}
+                                        <div class={`w-full border px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${badge.class}`}>
+                                            {badge.label}
+                                        </div>
                                     </div>
                                 );
                             })}
