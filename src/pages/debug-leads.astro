@@ -30,13 +30,28 @@ let dbQueryEnd = 0;
 try {
     pb.autoCancellation(false);
     dbQueryStart = Date.now();
-    // Traemos los últimos 500 leads para no saturar la memoria en modo debug pero tener buenos datos
-    const records = await pb.collection('leads_report').getList(1, 500, {
+    
+    // Traemos 2000 leads para tener un buen historial de varios meses
+    const records = await pb.collection('leads_report').getList(1, 2000, {
         sort: '-created'
     });
+    
     allLeads = records.items;
+    
+    // SISTEMA ANTI-MESES CORTADOS:
+    // Si trajimos 2000 registros exactos, significa que el último mes está incompleto.
+    // Vamos a identificar cuál es ese mes viejo y lo eliminamos de la data para que los demás salgan perfectos.
+    if (allLeads.length === 2000) {
+        const oldestLead = allLeads[allLeads.length - 1];
+        const mesCortado = oldestLead.Mes_Ano; // Ej: "January 2025"
+        if (mesCortado) {
+            allLeads = allLeads.filter(lead => lead.Mes_Ano !== mesCortado);
+            diagnostics['Filtro Anti-Cortes'] = `Mes incompleto ignorado: ${mesCortado}`;
+        }
+    }
+    
     dbQueryEnd = Date.now();
-    diagnostics['Query Leads (Ultimos 500)'] = `OK - ${allLeads.length} registros en ${dbQueryEnd - dbQueryStart}ms`;
+    diagnostics['Query Leads (Procesados)'] = `OK - ${allLeads.length} registros válidos en ${dbQueryEnd - dbQueryStart}ms`;
 } catch (e: any) {
     queryError = String(e);
     diagnostics['Query Leads'] = `ERROR: ${queryError}`;
@@ -73,6 +88,7 @@ const MONTH_MAP: Record<string, number> = {
 };
 
 function parseSemanaToSortKey(semana: string): number {
+    if (!semana || semana === 'Sin semana') return 0;
     // Extraer partes: "16-20 Feb 2026" -> dayEnd=20, month=2, year=2026
     const match = semana.match(/(\d+)-(\d+)\s+(\w+)\s+(\d{4})/);
     if (!match) return 0;
@@ -83,6 +99,7 @@ function parseSemanaToSortKey(semana: string): number {
 }
 
 // Convertir a lista y ordenar por fecha descendente (mas reciente primero)
+// Dentro del mismo periodo, ordenar por dominio A-Z
 const groupedLeads = Object.values(resumen).sort((a: any, b: any) => {
     const dateA = parseSemanaToSortKey(a.semana);
     const dateB = parseSemanaToSortKey(b.semana);
@@ -168,7 +185,7 @@ const pageLoadEnd = Date.now();
     )}
 
     <h2 id="s2">2. Leads Agrupados (Dominio + Semana) &mdash; Ordenados por fecha mas reciente</h2>
-    <p style="color: #888;">Los datos mostrados están limpios de duplicados desde Airtable. Ordenados del periodo mas reciente al mas antiguo.</p>
+    <p style="color: #888;">Ordenado de mas reciente a mas viejo. Dentro del mismo periodo, por dominio A-Z.</p>
 
     {groupedLeads.length === 0 ? (
         <p class="fail">No se encontraron leads.</p>
@@ -179,7 +196,7 @@ const pageLoadEnd = Date.now();
                     <th style="width: 180px;">Semana (Periodo)</th>
                     <th>Dominio</th>
                     <th>Marca (Brand)</th>
-                    <th>Total Leads Unicos</th>
+                    <th>Total Leads Únicos</th>
                 </tr>
             </thead>
             <tbody>
