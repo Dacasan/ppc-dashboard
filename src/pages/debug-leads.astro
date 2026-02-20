@@ -31,24 +31,11 @@ try {
     pb.autoCancellation(false);
     dbQueryStart = Date.now();
     
-    // Traemos 2000 leads para tener un buen historial de varios meses
-    const records = await pb.collection('leads_report').getList(1, 2000, {
+    // Traemos TODOS los leads usando getFullList que auto-pagina
+    // Esto evita el problema de cortar semanas cuando hay más de N registros
+    allLeads = await pb.collection('leads_report').getFullList({
         sort: '-created'
     });
-    
-    allLeads = records.items;
-    
-    // SISTEMA ANTI-MESES CORTADOS:
-    // Si trajimos 2000 registros exactos, significa que el último mes está incompleto.
-    // Vamos a identificar cuál es ese mes viejo y lo eliminamos de la data para que los demás salgan perfectos.
-    if (allLeads.length === 2000) {
-        const oldestLead = allLeads[allLeads.length - 1];
-        const mesCortado = oldestLead.Mes_Ano; // Ej: "January 2025"
-        if (mesCortado) {
-            allLeads = allLeads.filter(lead => lead.Mes_Ano !== mesCortado);
-            diagnostics['Filtro Anti-Cortes'] = `Mes incompleto ignorado: ${mesCortado}`;
-        }
-    }
     
     dbQueryEnd = Date.now();
     diagnostics['Query Leads (Procesados)'] = `OK - ${allLeads.length} registros válidos en ${dbQueryEnd - dbQueryStart}ms`;
@@ -130,10 +117,10 @@ const pageLoadEnd = Date.now();
         .fail { color: #f44; font-weight: bold; }
         .warn { color: #ff0; }
 
-        table.data { width: 100%; border-collapse: collapse; background: #1a1a1a; font-size: 12px; margin-bottom: 20px; }
-        table.data th, table.data td { border: 1px solid #333; padding: 6px; text-align: right; }
+        table.data { width: 100%; border-collapse: collapse; background: #1a1a1a; font-size: 12px; margin-bottom: 20px; table-layout: fixed; }
+        table.data th, table.data td { border: 1px solid #333; padding: 4px 6px; text-align: right; }
         table.data th { background: #222; text-align: center; font-weight: bold; color: #0f0; }
-        table.data td.text { text-align: left; color: #ccc; }
+        table.data td.text { text-align: left; color: #ccc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .val { font-weight: bold; color: #fff; }
 
         .debug-json { background: #0a0a0a; color: #0f0; padding: 15px; overflow-x: auto; max-height: 400px; border: 1px solid #333; font-size: 11px; margin-bottom: 20px; }
@@ -193,10 +180,10 @@ const pageLoadEnd = Date.now();
         <table class="data">
             <thead>
                 <tr>
-                    <th style="width: 180px;">Semana (Periodo)</th>
-                    <th>Dominio</th>
-                    <th>Marca (Brand)</th>
-                    <th>Total Leads Únicos</th>
+                    <th style="width: 160px;">Semana (Periodo)</th>
+                    <th style="width: 140px;">Dominio</th>
+                    <th style="width: 120px;">Marca</th>
+                    <th style="width: 80px;">Leads</th>
                 </tr>
             </thead>
             <tbody>
@@ -208,8 +195,8 @@ const pageLoadEnd = Date.now();
                             <td class="text" style={`color: #0ff; font-weight: bold; ${!isNewPeriod ? 'color: #333;' : ''}`}>
                                 {isNewPeriod ? r.semana : ''}
                             </td>
-                            <td class="text"><strong>{r.dominio}</strong></td>
-                            <td class="text">{r.brand}</td>
+                            <td class="text" title={r.dominio}><strong>{r.dominio}</strong></td>
+                            <td class="text" title={r.brand}>{r.brand}</td>
                             <td class="val">{r.totalLeads}</td>
                         </tr>
                     );
