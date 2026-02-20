@@ -8,10 +8,6 @@ import Skeleton from '../components/ui/Skeleton.astro';
 // La logica pesada vive en LeadsDataDefer (server:defer)
 // ==========================================
 
-const user = Astro.locals.user || {};
-const userRole = user.role || 'marketing';
-const isAdmin = userRole === 'admin';
-
 // 1. LEER PARAMETROS DE URL
 const url = Astro.url;
 const now = new Date();
@@ -66,9 +62,9 @@ for (const y of AVAILABLE_YEARS) {
                 <p class="text-zinc-400 text-xs mt-1 font-medium">Flujo de prospectos por bloques semanales de cada unidad de negocio.</p>
             </div>
 
-            <div class={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium shadow-sm transition-colors ${isAdmin ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
-                <i class={`fa-solid ${isAdmin ? 'fa-unlock-keyhole' : 'fa-shield-halved'}`}></i>
-                Vista: {isAdmin ? 'Direccion (Gasto Visible)' : 'Marketing (Gasto Oculto)'}
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium shadow-sm transition-colors bg-blue-50 text-blue-700 border-blue-100">
+                <i class="fa-solid fa-chart-line"></i>
+                Leads &amp; Costos
             </div>
         </section>
 
@@ -86,7 +82,7 @@ for (const y of AVAILABLE_YEARS) {
                             </div>
                             <div class="flex items-center gap-4 bg-white px-4 py-2 rounded-lg border border-zinc-200">
                                 <Skeleton class="h-8 w-24" />
-                                {isAdmin && <Skeleton class="h-8 w-28" />}
+                                <Skeleton class="h-8 w-28" />
                             </div>
                         </div>
                         <!-- Period blocks skeleton -->
