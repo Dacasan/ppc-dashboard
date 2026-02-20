@@ -80,32 +80,31 @@ allLeads.forEach(lead => {
     resumen[key].totalLeads++;
 });
 
-// Convertir a lista y ordenar:
-// 1ro. Alfabéticamente por dominio
-// 2do. Cronológicamente por semana (De más reciente a más viejo)
-const groupedLeads = Object.values(resumen).sort((a: any, b: any) => {
-    // Ordenar por Dominio (A-Z)
-    if (a.dominio < b.dominio) return -1;
-    if (a.dominio > b.dominio) return 1;
-    
-    // Función helper para convertir "16-20 Feb 2026" a un timestamp real de JavaScript
-    const getWeekTimestamp = (semanaStr: string) => {
-        if (!semanaStr || semanaStr === 'Sin semana') return 0;
-        const parts = semanaStr.split(' '); // ["16-20", "Feb", "2026"]
-        if (parts.length >= 3) {
-            const startDay = parts[0].split('-')[0]; // "16"
-            const month = parts[1]; // "Feb"
-            const year = parts[2]; // "2026"
-            return new Date(`${month} ${startDay}, ${year}`).getTime();
-        }
-        return 0;
-    };
+// Parsear la semana para extraer fecha y ordenar por mas reciente
+// Formato esperado: "1-5 Feb 2026", "6-10 Jan 2026", etc.
+const MONTH_MAP: Record<string, number> = {
+    'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
+    'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
+};
 
-    const timeA = getWeekTimestamp(a.semana);
-    const timeB = getWeekTimestamp(b.semana);
-    
-    // Ordenar de más reciente (mayor) a más viejo (menor)
-    return timeB - timeA;
+function parseSemanaToSortKey(semana: string): number {
+    if (!semana || semana === 'Sin semana') return 0;
+    // Extraer partes: "16-20 Feb 2026" -> dayEnd=20, month=2, year=2026
+    const match = semana.match(/(\d+)-(\d+)\s+(\w+)\s+(\d{4})/);
+    if (!match) return 0;
+    const [, , dayEnd, monthStr, yearStr] = match;
+    const monthNum = MONTH_MAP[monthStr] || 0;
+    // Clave numerica: YYYYMMDD (usando el dia final del rango para ordenar)
+    return parseInt(yearStr) * 10000 + monthNum * 100 + parseInt(dayEnd);
+}
+
+// Convertir a lista y ordenar por fecha descendente (mas reciente primero)
+// Dentro del mismo periodo, ordenar por dominio A-Z
+const groupedLeads = Object.values(resumen).sort((a: any, b: any) => {
+    const dateA = parseSemanaToSortKey(a.semana);
+    const dateB = parseSemanaToSortKey(b.semana);
+    if (dateB !== dateA) return dateB - dateA; // Fecha descendente
+    return a.dominio.localeCompare(b.dominio);  // Mismo periodo: alfabetico por dominio
 });
 
 const pageLoadEnd = Date.now();
@@ -185,8 +184,8 @@ const pageLoadEnd = Date.now();
         </div>
     )}
 
-    <h2 id="s2">2. Leads Agrupados (Dominio + Semana)</h2>
-    <p style="color: #888;">Ordenado por Marca (A-Z) y luego de Más Reciente a Más Viejo cronológicamente.</p>
+    <h2 id="s2">2. Leads Agrupados (Dominio + Semana) &mdash; Ordenados por fecha mas reciente</h2>
+    <p style="color: #888;">Ordenado de mas reciente a mas viejo. Dentro del mismo periodo, por dominio A-Z.</p>
 
     {groupedLeads.length === 0 ? (
         <p class="fail">No se encontraron leads.</p>
@@ -194,21 +193,27 @@ const pageLoadEnd = Date.now();
         <table class="data">
             <thead>
                 <tr>
+                    <th style="width: 180px;">Semana (Periodo)</th>
                     <th>Dominio</th>
                     <th>Marca (Brand)</th>
-                    <th>Semana (Periodo)</th>
                     <th>Total Leads Únicos</th>
                 </tr>
             </thead>
             <tbody>
-                {groupedLeads.map(r => (
-                    <tr>
-                        <td class="text"><strong>{r.dominio}</strong></td>
-                        <td class="text">{r.brand}</td>
-                        <td class="text" style="color: #0ff;">{r.semana}</td>
-                        <td class="val">{r.totalLeads}</td>
-                    </tr>
-                ))}
+                {groupedLeads.map((r, i) => {
+                    const prevSemana = i > 0 ? groupedLeads[i - 1].semana : null;
+                    const isNewPeriod = r.semana !== prevSemana;
+                    return (
+                        <tr style={isNewPeriod && i > 0 ? 'border-top: 2px solid #0f0;' : ''}>
+                            <td class="text" style={`color: #0ff; font-weight: bold; ${!isNewPeriod ? 'color: #333;' : ''}`}>
+                                {isNewPeriod ? r.semana : ''}
+                            </td>
+                            <td class="text"><strong>{r.dominio}</strong></td>
+                            <td class="text">{r.brand}</td>
+                            <td class="val">{r.totalLeads}</td>
+                        </tr>
+                    );
+                })}
             </tbody>
         </table>
     )}
