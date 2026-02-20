@@ -30,8 +30,8 @@ function getCplBadge(cost: number, leads: number) {
     }
     const cpl = cost / leads;
     const cplText = formatMoney(cpl);
-    if (cpl < 150) return { label: 'CPL BAJO', cplText, class: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
-    if (cpl <= 350) return { label: 'CPL MEDIO', cplText, class: 'bg-amber-50 text-amber-700 border-amber-200' };
+    if (cpl < 1400) return { label: 'CPL BAJO', cplText, class: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+    if (cpl <= 1400) return { label: 'CPL MEDIO', cplText, class: 'bg-amber-50 text-amber-700 border-amber-200' };
     return { label: 'CPL ALTO', cplText, class: 'bg-rose-50 text-rose-700 border-rose-200' };
 }
 
