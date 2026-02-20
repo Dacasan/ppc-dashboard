@@ -1,11 +1,11 @@
 ---
 import { pb } from '../../lib/pb';
+import Skeleton from '../ui/Skeleton.astro';
 
 // ==========================================
 // SERVER ISLAND - Se ejecuta de forma asincrona (server:defer)
-// Toda la logica pesada y el manejo de errores vive aqui.
-// Si PocketBase falla (404, timeout, etc.), muestra un error amigable
-// en lugar de crashear la pagina completa.
+// Cada coleccion se consulta independientemente para aislar fallos.
+// Si una coleccion falla, la otra sigue mostrando datos.
 // ==========================================
 
 interface Props {
@@ -15,18 +15,15 @@ interface Props {
 
 const { month, year } = Astro.props;
 
-// Obtener usuario y rol desde el middleware
 const user = Astro.locals.user || {};
 const userRole = user.role || 'marketing';
 const isAdmin = userRole === 'admin';
 
-// Meses en ingles para filtrar leads_report
 const ENGLISH_MONTHS = [
     '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
 ];
 
-// Funciones de formato
 const formatMoney = (val: number) =>
     new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(val);
 
@@ -51,180 +48,237 @@ const periodKeys = [
 ];
 
 // ==========================================
-// FETCH DE DATOS CON TRY/CATCH ROBUSTO
+// FETCH INDEPENDIENTE POR COLECCION
 // ==========================================
-let marcasAgrupadas: any[] = [];
-let error: string | null = null;
+pb.autoCancellation(false);
+
+const targetMonthText = `${ENGLISH_MONTHS[month]} ${year}`;
+
+// --- A. CAMPAÑAS (gasto) ---
+let campanias: any[] = [];
+let campaignsError: string | null = null;
 
 try {
-    pb.autoCancellation(false);
-
-    const targetMonthText = `${ENGLISH_MONTHS[month]} ${year}`;
-
-    // A. TRAER CAMPANAS (Para el costo)
-    const campanias = await pb.collection('campaigns_reports').getFullList({
+    const result = await pb.collection('campaigns_reports').getFullList({
         filter: `tipo_registro="Marca" && month_num=${month} && year="${year}"`
     });
+    campanias = result;
+} catch (e: any) {
+    console.error('[LeadsDataDefer] Error en campaigns_reports:', e?.message || e);
+    campaignsError = e?.message || 'Error al conectar con campaigns_reports';
+}
 
-    // B. TRAER LEADS (Para el conteo real)
-    const rawLeads = await pb.collection('leads_report').getFullList({
+// --- B. LEADS (conteo real) ---
+let rawLeads: any[] = [];
+let leadsError: string | null = null;
+
+try {
+    const result = await pb.collection('leads_report').getFullList({
         filter: `Semana ~ "${targetMonthText}"`
     });
-
-    // C. AGRUPAR TODO POR MARCA
-    const resumen: Record<string, any> = {};
-
-    // Primero los datos de campanas (gasto y estructura)
-    campanias.forEach((camp: any) => {
-        const brand = camp.brand || 'UNKNOWN';
-        if (!resumen[brand]) {
-            resumen[brand] = {
-                brand,
-                total_leads_mes: 0,
-                cost_total_mes: camp.cost_total_mes || 0,
-                costos: {
-                    '1-5': camp.cost_01_05 || 0,
-                    '6-10': camp.cost_06_10 || 0,
-                    '11-15': camp.cost_11_15 || 0,
-                    '16-20': camp.cost_16_20 || 0,
-                    '21-25': camp.cost_21_25 || 0,
-                    '26-31': camp.cost_26_31 || 0
-                },
-                leads: {
-                    '1-5': 0, '6-10': 0, '11-15': 0,
-                    '16-20': 0, '21-25': 0, '26-31': 0
-                }
-            };
-        }
-    });
-
-    // Mapear leads reales en su bloque semanal
-    rawLeads.forEach((lead: any) => {
-        const brand = lead.brand;
-        if (!brand) return;
-
-        if (!resumen[brand]) {
-            resumen[brand] = {
-                brand, total_leads_mes: 0, cost_total_mes: 0,
-                costos: { '1-5': 0, '6-10': 0, '11-15': 0, '16-20': 0, '21-25': 0, '26-31': 0 },
-                leads: { '1-5': 0, '6-10': 0, '11-15': 0, '16-20': 0, '21-25': 0, '26-31': 0 }
-            };
-        }
-
-        resumen[brand].total_leads_mes++;
-
-        const sem = lead.Semana || '';
-        if (sem.startsWith('1-5') || sem.startsWith('01-05')) resumen[brand].leads['1-5']++;
-        else if (sem.startsWith('6-10') || sem.startsWith('06-10')) resumen[brand].leads['6-10']++;
-        else if (sem.startsWith('11-15')) resumen[brand].leads['11-15']++;
-        else if (sem.startsWith('16-20')) resumen[brand].leads['16-20']++;
-        else if (sem.startsWith('21-25')) resumen[brand].leads['21-25']++;
-        else if (sem.startsWith('26-') || sem.startsWith('26')) resumen[brand].leads['26-31']++;
-    });
-
-    marcasAgrupadas = Object.values(resumen).sort((a: any, b: any) => b.total_leads_mes - a.total_leads_mes);
-
+    rawLeads = result;
 } catch (e: any) {
-    console.error('[LeadsDataDefer] Error al traer datos de PocketBase:', e?.message || e);
-    error = e?.message || 'Error desconocido al conectar con la base de datos.';
+    console.error('[LeadsDataDefer] Error en leads_report:', e?.message || e);
+    leadsError = e?.message || 'Error al conectar con leads_report';
 }
+
+// --- C. AGRUPAR TODO POR MARCA ---
+const resumen: Record<string, any> = {};
+
+campanias.forEach((camp: any) => {
+    const brand = camp.brand || 'UNKNOWN';
+    if (!resumen[brand]) {
+        resumen[brand] = {
+            brand,
+            total_leads_mes: 0,
+            cost_total_mes: camp.cost_total_mes || 0,
+            costos: {
+                '1-5': camp.cost_01_05 || 0,
+                '6-10': camp.cost_06_10 || 0,
+                '11-15': camp.cost_11_15 || 0,
+                '16-20': camp.cost_16_20 || 0,
+                '21-25': camp.cost_21_25 || 0,
+                '26-31': camp.cost_26_31 || 0
+            },
+            leads: {
+                '1-5': 0, '6-10': 0, '11-15': 0,
+                '16-20': 0, '21-25': 0, '26-31': 0
+            }
+        };
+    }
+});
+
+rawLeads.forEach((lead: any) => {
+    const brand = lead.brand;
+    if (!brand) return;
+
+    if (!resumen[brand]) {
+        resumen[brand] = {
+            brand, total_leads_mes: 0, cost_total_mes: 0,
+            costos: { '1-5': 0, '6-10': 0, '11-15': 0, '16-20': 0, '21-25': 0, '26-31': 0 },
+            leads: { '1-5': 0, '6-10': 0, '11-15': 0, '16-20': 0, '21-25': 0, '26-31': 0 }
+        };
+    }
+
+    resumen[brand].total_leads_mes++;
+
+    const sem = lead.Semana || '';
+    if (sem.startsWith('1-5') || sem.startsWith('01-05')) resumen[brand].leads['1-5']++;
+    else if (sem.startsWith('6-10') || sem.startsWith('06-10')) resumen[brand].leads['6-10']++;
+    else if (sem.startsWith('11-15')) resumen[brand].leads['11-15']++;
+    else if (sem.startsWith('16-20')) resumen[brand].leads['16-20']++;
+    else if (sem.startsWith('21-25')) resumen[brand].leads['21-25']++;
+    else if (sem.startsWith('26-') || sem.startsWith('26')) resumen[brand].leads['26-31']++;
+});
+
+const marcasAgrupadas = Object.values(resumen).sort((a: any, b: any) => b.total_leads_mes - a.total_leads_mes);
+
+const bothFailed = !!(campaignsError && leadsError);
+const hasData = marcasAgrupadas.length > 0;
 ---
 
 <!-- ==========================================
-     RENDERIZADO CONDICIONAL
+     ERRORES POR COLECCION (parciales o totales)
      ========================================== -->
 
-{error ? (
-    <!-- Error amigable - nunca crashea la pagina -->
-    <div class="bg-rose-50 border border-rose-200 rounded-2xl p-8 text-center">
-        <div class="w-14 h-14 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <i class="fa-solid fa-triangle-exclamation text-rose-500 text-2xl"></i>
-        </div>
-        <h3 class="text-lg font-bold text-rose-800 mb-2">Hubo un problema al cargar los datos</h3>
-        <p class="text-rose-600 text-sm mb-4 max-w-md mx-auto">
-            No pudimos conectar con la base de datos. Esto puede ser temporal. Intenta recargar la pagina.
-        </p>
-        <details class="text-left max-w-md mx-auto">
-            <summary class="text-rose-400 text-xs cursor-pointer hover:text-rose-500 transition-colors">
-                Ver detalle tecnico
-            </summary>
-            <pre class="mt-2 text-[11px] text-rose-400 bg-rose-100 rounded-lg p-3 overflow-x-auto">{error}</pre>
-        </details>
-        <button onclick="window.location.reload()" class="mt-4 px-5 py-2 bg-rose-600 text-white text-sm font-semibold rounded-lg hover:bg-rose-700 transition-colors">
-            <i class="fa-solid fa-rotate-right mr-2"></i>Reintentar
-        </button>
-    </div>
-) : marcasAgrupadas.length > 0 ? (
-    <!-- Datos cargados exitosamente -->
-    <div class="flex flex-col gap-6">
-        {marcasAgrupadas.map((record: any) => (
-            <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
-
-                <!-- Header de marca -->
-                <div class="bg-zinc-50 border-b border-zinc-200 px-6 py-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-lg bg-zinc-900 text-white flex items-center justify-center font-black text-sm shadow-sm">
-                            {record.brand}
-                        </div>
-                        <h2 class="font-black text-lg text-zinc-900">
-                            {record.brand === 'GLOBAL' ? 'Resumen Global' : `Marca: ${record.brand}`}
-                        </h2>
-                    </div>
-
-                    <div class="flex items-center gap-4 bg-white px-4 py-2 rounded-lg border border-zinc-200">
-                        <div class="flex flex-col">
-                            <span class="text-[10px] uppercase font-bold text-zinc-400 tracking-wide">Total Leads Mes</span>
-                            <span class="text-base font-black text-zinc-900">
-                                {record.total_leads_mes} <i class="fa-solid fa-users text-blue-500 text-xs ml-1"></i>
-                            </span>
-                        </div>
-                        {isAdmin && (
-                            <>
-                                <div class="w-px h-8 bg-zinc-200 mx-2"></div>
-                                <div class="flex flex-col text-right">
-                                    <span class="text-[10px] uppercase font-bold text-zinc-400 tracking-wide">Inversion Mes</span>
-                                    <span class="text-base font-black text-blue-600">{formatMoney(record.cost_total_mes)}</span>
-                                </div>
-                            </>
-                        )}
+{bothFailed ? (
+    <!-- Ambas colecciones fallaron -->
+    <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
+        <div class="p-8 flex flex-col items-center text-center">
+            <div class="w-12 h-12 bg-rose-100 rounded-xl flex items-center justify-center mb-4">
+                <i class="fa-solid fa-database text-rose-500 text-xl"></i>
+            </div>
+            <h3 class="text-base font-bold text-zinc-900 mb-1">No se pudieron cargar los datos</h3>
+            <p class="text-zinc-500 text-sm mb-5 max-w-sm">
+                Las dos fuentes de datos fallaron. Puede ser un problema temporal de conexion.
+            </p>
+            <div class="w-full max-w-md space-y-2 mb-5">
+                <div class="flex items-center gap-2 bg-rose-50 border border-rose-100 rounded-lg px-4 py-2.5 text-left">
+                    <i class="fa-solid fa-xmark text-rose-400 text-xs"></i>
+                    <div class="flex-1 min-w-0">
+                        <span class="text-xs font-bold text-rose-700 block">campaigns_reports</span>
+                        <span class="text-[11px] text-rose-400 truncate block">{campaignsError}</span>
                     </div>
                 </div>
-
-                <!-- Bloques de periodos semanales -->
-                <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 divide-y md:divide-y-0 md:divide-x divide-zinc-100">
-                    {periodKeys.map(pk => {
-                        const leads = record.leads[pk.key];
-                        const cost = record.costos[pk.key];
-                        const badge = getCplBadge(cost, leads);
-
-                        return (
-                            <div class="p-5 flex flex-col items-center justify-center text-center hover:bg-zinc-50/50 transition-colors">
-                                <div class="flex items-center gap-1.5 text-xs font-bold text-zinc-400 mb-3 uppercase tracking-wider">
-                                    <i class="fa-regular fa-calendar text-[10px]"></i> Dias {pk.label}
-                                </div>
-                                <span class="text-3xl font-black text-zinc-900 tracking-tight leading-none mb-3">
-                                    {leads} <span class="text-xs font-bold text-zinc-400 ml-0.5">L</span>
-                                </span>
-                                {isAdmin ? (
-                                    <div class="w-full bg-blue-50/50 border border-blue-100 px-3 py-1.5 rounded-lg text-sm font-bold text-blue-600">
-                                        {formatMoney(cost)}
-                                    </div>
-                                ) : (
-                                    <div class={`w-full border px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${badge.class}`}>
-                                        {badge.label}
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
+                <div class="flex items-center gap-2 bg-rose-50 border border-rose-100 rounded-lg px-4 py-2.5 text-left">
+                    <i class="fa-solid fa-xmark text-rose-400 text-xs"></i>
+                    <div class="flex-1 min-w-0">
+                        <span class="text-xs font-bold text-rose-700 block">leads_report</span>
+                        <span class="text-[11px] text-rose-400 truncate block">{leadsError}</span>
+                    </div>
                 </div>
             </div>
-        ))}
+            <button onclick="window.location.reload()" class="px-5 py-2 bg-zinc-900 text-white text-sm font-semibold rounded-lg hover:bg-zinc-800 transition-colors">
+                <i class="fa-solid fa-rotate-right mr-2"></i>Reintentar
+            </button>
+        </div>
     </div>
 ) : (
-    <!-- Sin registros para este mes -->
-    <div class="bg-white rounded-2xl border border-zinc-200 p-12 text-center">
-        <i class="fa-solid fa-chart-bar text-zinc-300 text-5xl mb-4"></i>
-        <p class="text-zinc-500 text-sm font-medium">No hay registros para este mes.</p>
-    </div>
+    <>
+        <!-- Banners de error parcial (una coleccion fallo pero la otra funciono) -->
+        {campaignsError && (
+            <div class="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
+                <div class="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <i class="fa-solid fa-triangle-exclamation text-amber-500 text-sm"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <span class="text-sm font-bold text-amber-800">campaigns_reports no disponible</span>
+                    <span class="text-xs text-amber-600 block truncate">Los datos de gasto no se pudieron cargar. Leads siguen visibles. &mdash; {campaignsError}</span>
+                </div>
+            </div>
+        )}
+
+        {leadsError && (
+            <div class="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
+                <div class="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <i class="fa-solid fa-triangle-exclamation text-amber-500 text-sm"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <span class="text-sm font-bold text-amber-800">leads_report no disponible</span>
+                    <span class="text-xs text-amber-600 block truncate">El conteo de leads fallo. Datos de campanas siguen visibles. &mdash; {leadsError}</span>
+                </div>
+            </div>
+        )}
+
+        <!-- ==========================================
+             DATOS (parciales o completos)
+             ========================================== -->
+
+        {hasData ? (
+            <div class="flex flex-col gap-6">
+                {marcasAgrupadas.map((record: any) => (
+                    <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
+
+                        <!-- Header de marca -->
+                        <div class="bg-zinc-50 border-b border-zinc-200 px-6 py-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-lg bg-zinc-900 text-white flex items-center justify-center font-black text-sm shadow-sm">
+                                    {record.brand}
+                                </div>
+                                <h2 class="font-black text-lg text-zinc-900">
+                                    {record.brand === 'GLOBAL' ? 'Resumen Global' : `Marca: ${record.brand}`}
+                                </h2>
+                            </div>
+
+                            <div class="flex items-center gap-4 bg-white px-4 py-2 rounded-lg border border-zinc-200">
+                                <div class="flex flex-col">
+                                    <span class="text-[10px] uppercase font-bold text-zinc-400 tracking-wide">Total Leads Mes</span>
+                                    <span class="text-base font-black text-zinc-900">
+                                        {record.total_leads_mes} <i class="fa-solid fa-users text-blue-500 text-xs ml-1"></i>
+                                    </span>
+                                </div>
+                                {isAdmin && !campaignsError && (
+                                    <>
+                                        <div class="w-px h-8 bg-zinc-200 mx-2"></div>
+                                        <div class="flex flex-col text-right">
+                                            <span class="text-[10px] uppercase font-bold text-zinc-400 tracking-wide">Inversion Mes</span>
+                                            <span class="text-base font-black text-blue-600">{formatMoney(record.cost_total_mes)}</span>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
+                        <!-- Bloques de periodos semanales -->
+                        <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 divide-y md:divide-y-0 md:divide-x divide-zinc-100">
+                            {periodKeys.map(pk => {
+                                const leads = record.leads[pk.key];
+                                const cost = record.costos[pk.key];
+                                const badge = getCplBadge(cost, leads);
+
+                                return (
+                                    <div class="p-5 flex flex-col items-center justify-center text-center hover:bg-zinc-50/50 transition-colors">
+                                        <div class="flex items-center gap-1.5 text-xs font-bold text-zinc-400 mb-3 uppercase tracking-wider">
+                                            <i class="fa-regular fa-calendar text-[10px]"></i> Dias {pk.label}
+                                        </div>
+                                        <span class="text-3xl font-black text-zinc-900 tracking-tight leading-none mb-3">
+                                            {leads} <span class="text-xs font-bold text-zinc-400 ml-0.5">L</span>
+                                        </span>
+                                        {isAdmin && !campaignsError ? (
+                                            <div class="w-full bg-blue-50/50 border border-blue-100 px-3 py-1.5 rounded-lg text-sm font-bold text-blue-600">
+                                                {formatMoney(cost)}
+                                            </div>
+                                        ) : (
+                                            <div class={`w-full border px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${badge.class}`}>
+                                                {badge.label}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        ) : (
+            <!-- Sin registros para este mes -->
+            <div class="bg-white rounded-2xl border border-zinc-200 p-12 text-center">
+                <div class="w-12 h-12 bg-zinc-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                    <i class="fa-solid fa-chart-bar text-zinc-400 text-xl"></i>
+                </div>
+                <p class="text-zinc-500 text-sm font-medium">No hay registros para este periodo.</p>
+                <p class="text-zinc-400 text-xs mt-1">Prueba seleccionando otro mes desde el selector de arriba.</p>
+            </div>
+        )}
+    </>
 )}
