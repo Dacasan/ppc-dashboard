@@ -14,12 +14,12 @@ export const formatNumber = (num: number | undefined) => {
 };
 
 // 3. Obtener color del CPL (Semáforo)
-// Verde < $800 | Amarillo < $1200 | Naranja >= $1200
+// Verde oscuro < $800 | Verde medio < $1200 | Verde claro >= $1200
 export const getCplColor = (cpl: number) => {
   if (cpl === 0) return 'text-zinc-400 bg-zinc-100 border-zinc-200';
   if (cpl < 800) return 'text-emerald-700 bg-emerald-50 border-emerald-200';
-  if (cpl < 1200) return 'text-yellow-700 bg-yellow-50 border-yellow-200';
-  return 'text-orange-700 bg-orange-50 border-orange-200';
+  if (cpl < 1200) return 'text-green-700 bg-green-50 border-green-200';
+  return 'text-teal-700 bg-teal-50 border-teal-200';
 };
 
 // 4. Helper para canales (Iconos y colores)
