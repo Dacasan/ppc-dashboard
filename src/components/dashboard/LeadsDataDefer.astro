@@ -25,13 +25,14 @@ const formatMoney = (val: number) =>
 
 function getCplBadge(cost: number, leads: number) {
     if (leads === 0) {
-        if (cost > 0) return { label: 'ALTO (0 LEADS)', class: 'bg-rose-50 text-rose-700 border-rose-200' };
-        return { label: 'SIN DATOS', class: 'bg-zinc-50 text-zinc-400 border-zinc-200' };
+        if (cost > 0) return { label: 'SIN LEADS', cplText: null, class: 'bg-rose-50 text-rose-700 border-rose-200' };
+        return { label: 'SIN DATOS', cplText: null, class: 'bg-zinc-50 text-zinc-400 border-zinc-200' };
     }
     const cpl = cost / leads;
-    if (cpl < 150) return { label: 'CPL BAJO', class: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
-    if (cpl <= 350) return { label: 'PROMEDIO', class: 'bg-amber-50 text-amber-700 border-amber-200' };
-    return { label: 'CPL ALTO', class: 'bg-rose-50 text-rose-700 border-rose-200' };
+    const cplText = formatMoney(cpl);
+    if (cpl < 150) return { label: 'CPL BAJO', cplText, class: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+    if (cpl <= 350) return { label: 'CPL MEDIO', cplText, class: 'bg-amber-50 text-amber-700 border-amber-200' };
+    return { label: 'CPL ALTO', cplText, class: 'bg-rose-50 text-rose-700 border-rose-200' };
 }
 
 const periodKeys = [
@@ -223,15 +224,25 @@ const hasData = marcasAgrupadas.length > 0;
                                         {record.total_leads_mes} <i class="fa-solid fa-users text-blue-500 text-xs ml-1"></i>
                                     </span>
                                 </div>
-                                {!campaignsError && (
+                                {!campaignsError && (() => {
+                                    const totalBadge = getCplBadge(record.cost_total_mes, record.total_leads_mes);
+                                    return (
                                     <>
                                         <div class="w-px h-8 bg-zinc-200 mx-2"></div>
                                         <div class="flex flex-col text-right">
                                             <span class="text-[10px] uppercase font-bold text-zinc-400 tracking-wide">Inversion Mes</span>
                                             <span class="text-base font-black text-blue-600">{formatMoney(record.cost_total_mes)}</span>
                                         </div>
+                                        <div class="w-px h-8 bg-zinc-200 mx-2"></div>
+                                        <div class="flex flex-col text-right">
+                                            <span class="text-[10px] uppercase font-bold text-zinc-400 tracking-wide">CPL Mes</span>
+                                            <span class={`text-sm font-black px-2 py-0.5 rounded border ${totalBadge.class}`}>
+                                                {totalBadge.cplText || totalBadge.label}
+                                            </span>
+                                        </div>
                                     </>
-                                )}
+                                    );
+                                })()}
                             </div>
                         </div>
 
@@ -255,8 +266,15 @@ const hasData = marcasAgrupadas.length > 0;
                                                 {formatMoney(cost)}
                                             </div>
                                         )}
-                                        <div class={`w-full border px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${badge.class}`}>
-                                            {badge.label}
+                                        <div class={`w-full border px-3 py-1.5 rounded-lg text-center ${badge.class}`}>
+                                            {badge.cplText ? (
+                                                <>
+                                                    <div class="text-xs font-black">{badge.cplText}</div>
+                                                    <div class="text-[9px] font-bold uppercase tracking-wider opacity-75">{badge.label}</div>
+                                                </>
+                                            ) : (
+                                                <div class="text-[10px] font-black uppercase tracking-wider">{badge.label}</div>
+                                            )}
                                         </div>
                                     </div>
                                 );
